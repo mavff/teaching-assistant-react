@@ -1,0 +1,133 @@
+---
+config:
+  theme: base
+  layout: dagre
+  themeVariables:
+    fontFamily: Arial
+    fontSize: 22px
+    primaryColor: '#f6faf7'
+    primaryTextColor: '#182b35'
+    primaryBorderColor: '#182b35'
+    lineColor: '#182b35'
+    secondaryColor: '#e4f8fa'
+  class:
+    theme: base
+    look: classic
+    nodeSpacing: 90
+    rankSpacing: 140
+    diagramPadding: 40
+    textHeight: 32
+    padding: 20
+    dividerMargin: 12
+    htmlLabels: false
+    hideEmptyMembersBox: true
+    useMaxWidth: false
+---
+classDiagram
+direction LR
+
+%% CLIENTE: módulos já validados.
+namespace Cliente {
+  class Application
+  class Students
+  class Goals
+  class StudentService["Student Service"]
+  class Email
+  class ConfiguracaoLembretesCliente["Configuração de lembretes"]
+  class HistoricoNotificacoesCliente["Histórico de notificações"]
+  class EmailService["Email Service"]
+}
+
+class Interface["Interface (i)"]
+
+%% SERVIDOR: base do professor e extensões validadas.
+namespace Servidor {
+  class Services {
+    addStudent()
+    removeStudent()
+    synchronize()
+    configurarLembretes()
+    consultarHistorico()
+    consultarDetalhesNotificacao()
+  }
+  class StudentListImport["StudentList Import"]
+  class StudentList {
+    add(Student)
+    remove(Student)
+  }
+  class Student {
+    name
+    email
+  }
+  class GradesImportService["Grades Import Service"]
+  class Classes
+  class Class {
+    semester
+  }
+  class Enrolment
+  class Evaluation {
+    goal
+    grade
+  }
+  class GradeNotification["Grade Notification"]
+  class EmailSender {
+    send(String[])
+  }
+  class ConfiguracaoLembretes {
+    add(Lembrete)
+  }
+  class Lembrete {
+    data
+    horário
+    estado
+  }
+  class HistoricoNotificacoes
+  class Notificacao
+}
+
+%% CLIENTE E INTERFACE: preserve as duas formas de acesso ao servidor.
+Application --> Students
+Application --> Goals
+Students --> StudentService
+Goals --> StudentService
+StudentService --> Interface
+Interface -- Services
+Application --> Email
+Email --> ConfiguracaoLembretesCliente
+Email --> HistoricoNotificacoesCliente
+ConfiguracaoLembretesCliente --> EmailService
+HistoricoNotificacoesCliente --> EmailService
+EmailService --> Interface
+
+%% BASE DO SERVIDOR: relações do diagrama original.
+Services --> StudentListImport
+Services --> StudentList
+Services --> GradesImportService
+Services --> Classes
+Services --> GradeNotification
+StudentList *--> "*" Student
+GradesImportService --> Classes
+Classes *--> "*" Class
+Class *--> "*" Enrolment
+Student "1" *--o "*" Enrolment : enrolments / student
+GradeNotification o--> "*" Enrolment
+Enrolment *--> "*" Evaluation : auto-evaluations
+Enrolment *--> "*" Evaluation : evaluations
+GradeNotification --> EmailSender
+
+%% EXTENSÕES JÁ VALIDADAS.
+Class --> ConfiguracaoLembretes
+ConfiguracaoLembretes *--> "*" Lembrete : lembretes
+Services --> HistoricoNotificacoes
+
+%% NOTIFICAÇÃO: objeto e ligações aprovados para este incremento.
+HistoricoNotificacoes *--> "*" Notificacao
+Notificacao --> Lembrete : origem
+
+%% Os campos de Notificacao serão definidos em conjunto.
+%% TentativaEnvio será modelada no próximo incremento.
+%% PROPOSTA PENDENTE, ainda não desenhada: GradeNotification --> Lembrete.
+%% A relação de GradeNotification com EmailSender já existe na base.
+
+style Notificacao fill:#fff4cd,stroke:#93600c,stroke-width:2px
+note for Services "configurarLembretes reúne quantidade, datas e horários."
