@@ -181,6 +181,9 @@ conceitual; os testes da futura implementação precisam comprovar suas regras.
 O acompanhamento dos 26 cenários de lembretes está em
 [COBERTURA-CENARIOS.md](COBERTURA-CENARIOS.md), separando regras representadas,
 lacunas e resultados de descoberta dos testes.
+Esses cenários e suas marcações orientam a avaliação de completude do DDD desta
+feature; a cada incremento, revise a cobertura conforme o critério registrado
+na matriz. `//ok DDD (regra central)` não significa cobertura integral do cenário.
 Quando outra equipe ainda não disponibiliza uma dependência, combine seu contrato
 e os dados necessários para um mock/stub. Não trate esse dado simulado como uma
 funcionalidade já implementada no projeto.
