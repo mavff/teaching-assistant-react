@@ -1,5 +1,6 @@
 ---
 config:
+  markdownAutoWrap: false
   theme: base
   layout: dagre
   themeVariables:
@@ -75,14 +76,28 @@ namespace Servidor {
   }
   class ConfiguracaoLembretes {
     add(Lembrete)
+    remove(Lembrete)
+    atualizar(quantidade, lembretesPropostos, instanteAtual, prazoAcademico)
   }
   class Lembrete {
+    id
     data
     horário
     estado
+    reagendar(novaData, novoHorario, instanteAtual, prazoAcademico)
   }
-  class HistoricoNotificacoes
-  class Notificacao
+  class LembreteService["Lembrete Service"] {
+    processar(Lembrete)
+  }
+  class HistoricoNotificacoes {
+    registrar(Notificacao)
+  }
+  class Notificacao {
+    dataHora
+    resultado
+    motivo
+    descricaoFalha
+  }
 }
 
 %% CLIENTE E INTERFACE: preserve as duas formas de acesso ao servidor.
@@ -100,6 +115,8 @@ HistoricoNotificacoesCliente --> EmailService
 EmailService --> Interface
 
 %% BASE DO SERVIDOR: relações do diagrama original.
+%% A ordem desta declaração orienta apenas a apresentação, sem mudar seus extremos.
+Student "1" *--o "*" Enrolment : enrolments / student
 Services --> StudentListImport
 Services --> StudentList
 Services --> GradesImportService
@@ -109,7 +126,6 @@ StudentList *--> "*" Student
 GradesImportService --> Classes
 Classes *--> "*" Class
 Class *--> "*" Enrolment
-Student "1" *--o "*" Enrolment : enrolments / student
 GradeNotification o--> "*" Enrolment
 Enrolment *--> "*" Evaluation : auto-evaluations
 Enrolment *--> "*" Evaluation : evaluations
@@ -124,9 +140,66 @@ Services --> HistoricoNotificacoes
 HistoricoNotificacoes *--> "*" Notificacao
 Notificacao --> Lembrete : origem
 
-%% Os campos de Notificacao serão definidos em conjunto.
-%% TentativaEnvio será modelada no próximo incremento.
-%% PROPOSTA PENDENTE, ainda não desenhada: GradeNotification --> Lembrete.
+%% PROCESSAMENTO DOS LEMBRETES: serviço de aplicação e associações de acesso.
+%% Processar um lembrete não implica envio obrigatório.
+%% Classes permite acessar as turmas, suas configurações e os lembretes.
+%% Esta associação não define a busca por horários nem o início automático do processamento.
+%% A escrita invertida orienta o layout; o acesso continua de LembreteService para Classes.
+Classes <-- LembreteService
+LembreteService --> Lembrete
+LembreteService --> EmailSender
+%% A escrita invertida mantém o acesso de LembreteService ao histórico.
+HistoricoNotificacoes <-- LembreteService
+
+%% IDENTIDADE DO LEMBRETE: alterar data ou horário preserva seu id.
+%% Um novo lembrete recebe outra identidade; formato e geração do id ainda não estão definidos.
+%% O id permite reconhecer o mesmo lembrete, mas não garante prevenção de duplicidade.
+
+%% REAGENDAMENTO: operação de negócio do Lembrete, preservando seu id.
+%% Rejeitar alteração de lembrete Enviado, novo agendamento anterior a instanteAtual
+%% ou posterior ao prazoAcademico recebido pela operação.
+%% Validar antes de alterar: rejeições preservam data, horário e estado anteriores.
+%% Reagendar não modifica outros lembretes, outra turma nem notificações históricas.
+%% instanteAtual é recebido do serviço, que consulta o relógio do servidor.
+%% A origem do prazoAcademico continua pendente.
+
+%% REMOÇÃO: remove(Lembrete) retira da configuração o lembrete indicado, pertencente a ela.
+%% Lembretes Enviados são preservados; uma remoção rejeitada mantém a configuração intacta.
+%% A remoção preserva os demais lembretes e os registros históricos.
+%% A redução de quantidade é representada pela remoção, sem novo atributo de quantidade.
+%% Alterações e remoções nos estados Falha, Ignorado e Cancelado ainda serão discutidas.
+%% Não enviado e Agendado não são unificados por este incremento.
+
+%% ATUALIZAÇÃO COMPLETA: atualizar recebe a proposta do conjunto final antes de alterar a configuração.
+%% lembretesPropostos são dados de edição, não uma nova entidade nem lembretes já modificados.
+%% A quantidade informada deve corresponder ao total final, incluindo os Enviados preservados.
+%% Novos lembretes exigem data e horário; agendamentos novos ou alterados não podem
+%% ser anteriores a instanteAtual nem posteriores ao prazoAcademico recebido.
+%% Enviados devem permanecer presentes e inalterados; suas datas antigas são preservadas.
+%% Alterações em lembretes existentes preservam seus ids.
+%% Validar todo o conjunto antes de aplicar: qualquer rejeição mantém a configuração anterior intacta.
+%% A atualização não afeta outras turmas nem o histórico, e não acrescenta quantidade como atributo.
+%% Services.configurarLembretes continua sendo a entrada conceitual da aplicação.
+%% O serviço consulta o relógio do servidor uma vez por atualização e fornece instanteAtual.
+%% instanteAtual não é informado pelo professor nem armazenado como atributo da configuração.
+%% A origem do prazo e a gravação integral em armazenamento continuam pendentes.
+
+%% Nesta feature, cada Notificacao registra uma tentativa de envio realizada.
+%% dataHora registra o momento da tentativa; motivo descreve o propósito do aviso.
+%% resultado é Enviado ou Falha; Enviado indica aceitação pelo serviço de email.
+%% descricaoFalha é preenchida quando houver falha.
+%% Um reenvio gera outra Notificacao para o mesmo Lembrete, preservando a anterior.
+%% REGISTRO DOS RESULTADOS: o LembreteService coordena o registro de cada tentativa realizada.
+%% HistoricoNotificacoes.registrar acrescenta a Notificacao sem substituir ou alterar registros anteriores.
+%% Uma falha mantém resultado Falha e descricaoFalha; um reenvio aceito gera outro registro Enviado.
+%% Os dois registros podem referenciar o mesmo Lembrete, sem representar dois lembretes enviados.
+%% Esta associação indica acesso; não define sequência de chamadas nem persistência.
+%% Processar sem tentativa de email não gera uma Notificacao de tentativa.
+%% Seleção do histórico por professor, estados, programação de reenvios e duplicidade continuam pendentes.
+%% TentativaEnvio não será acrescentada neste incremento.
+%% O registro de processamento ignorado e os detalhes históricos continuam pendentes.
+%% Os cenários usam motivo tanto para o propósito do aviso quanto para a causa da falha.
+%% Essa diferença de linguagem precisa de validação; os cenários não são reinterpretados aqui.
 %% A relação de GradeNotification com EmailSender já existe na base.
 
 style Notificacao fill:#fff4cd,stroke:#93600c,stroke-width:2px

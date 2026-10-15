@@ -11,6 +11,7 @@ apresentada pelo professor. Cada integrante pode propor os conceitos necessário
 | [modelo-ddd.mmd](modelo-ddd.mmd) | Fonte oficial do diagrama. Contém somente código Mermaid, incluindo configuração e comentários. |
 | [GUIA-MERMAID.md](GUIA-MERMAID.md) | Este guia: instruções e exemplos isolados. |
 | [ddd-notificacoes-incremental.png](ddd-notificacoes-incremental.png) | Imagem exportada para visualização rápida. |
+| [exportar-modelo-ddd.py](../../scripts/exportar-modelo-ddd.py) | Exporta o Mermaid e acrescenta a legenda abaixo do diagrama no PNG. |
 
 Edite o `.mmd` para modificar o modelo. O PNG precisa ser atualizado depois das
 mudanças aprovadas; editar a imagem não modifica o código. O arquivo `.mmd` pode
@@ -109,18 +110,32 @@ ExemploServico --> ExemploConfiguracao : acesso
 No modelo principal, declare os elementos primeiro e acrescente a relação na
 seção de relações correspondente. Use seus identificadores, não seus nomes visíveis.
 
+### Legenda do modelo
+
+![Modelo DDD com legenda de relações e multiplicidades](ddd-notificacoes-incremental.png)
+
+A legenda também faz parte do próprio PNG, para acompanhar a imagem compartilhada.
+Ela explica a notação; não acrescenta classes ou relações ao modelo.
+
 | Sintaxe | Significado |
 | --- | --- |
 | `A --> B` | Associação com navegação de A para B: A acessa ou referencia B. |
+| `B <-- A` | O mesmo acesso de A para B; a escrita invertida pode ajudar a organizar o layout. |
 | `A -- B` | Ligação sem uma direção de navegação indicada. |
 | `A *--> B` | Composição com navegação: B faz parte de A; o losango preenchido fica em A. |
 | `A o--> B` | Agregação com navegação: A agrupa B; o losango vazio fica em A. |
 | `A --> B : origem` | Associação com um rótulo que explica seu significado. |
 | `A "1" --> "*" B` | Cada A associa-se a zero ou mais B; cada B associa-se a um A. |
+| Ligação pontilhada de anotação | Conecta uma nota explicativa ao elemento; não acrescenta uma associação de domínio. |
 
 As multiplicidades aparecem entre aspas junto aos extremos: `"1"` significa um,
 `"0..1"` significa zero ou um, `"*"` significa zero ou mais e `"1..*"` significa
 um ou mais. Escolha-as a partir das regras da feature, não da posição das caixas.
+
+O losango fica no extremo do todo ou agrupador. O asterisco tem dois usos distintos:
+em `*--` é o comando Mermaid para desenhar composição; em `"*"` junto ao extremo
+é uma multiplicidade. Uma seta representa acesso ou referência, sem definir
+sequência de chamadas, navegação de telas ou autorização.
 
 O modelo original também contém extremos combinados, como a relação entre
 `Student` e `Enrolment`. Preserve sua notação enquanto a equipe não revisar seu
@@ -137,6 +152,10 @@ O Mermaid calcula as posições. No cabeçalho existente:
 - Aumente `nodeSpacing` para ampliar o espaço entre elementos.
 - Aumente `rankSpacing` para ampliar o espaço entre camadas do desenho.
 - Ajuste `fontSize` com cuidado para manter nomes e operações legíveis.
+
+O cabeçalho usa `markdownAutoWrap: false` para manter as operações em uma linha
+e evitar sobreposição entre métodos quando a assinatura é longa. Preserve essa
+opção ao exportar ou colar a fonte completa no Mermaid Live.
 
 Faça ajustes pequenos e observe o resultado. Preserve a indentação do YAML e os
 nomes das configurações. Para resolver falta de espaço, ajuste a apresentação;
@@ -162,6 +181,84 @@ conceitual; os testes da futura implementação precisam comprovar suas regras.
 Quando outra equipe ainda não disponibiliza uma dependência, combine seu contrato
 e os dados necessários para um mock/stub. Não trate esse dado simulado como uma
 funcionalidade já implementada no projeto.
+
+### Atualização completa da configuração de lembretes
+
+`Services.configurarLembretes()` continua sendo a entrada conceitual da aplicação.
+Em `ConfiguracaoLembretes`, a operação
+`atualizar(quantidade, lembretesPropostos, instanteAtual, prazoAcademico)` representa a validação
+do conjunto final pretendido antes de aplicar qualquer alteração.
+
+`lembretesPropostos` são os dados de edição, não uma nova entidade nem lembretes que já
+foram alterados. A quantidade informada deve corresponder ao total final,
+incluindo os enviados que serão preservados; ela não é um novo atributo permanente.
+
+`instanteAtual` é a data e o horário que o serviço obtém consultando o relógio do
+servidor uma vez por atualização. O professor não informa esse argumento, e a
+configuração não o guarda como atributo. Ele é utilizado apenas para comparar
+os agendamentos novos ou alterados com o momento da operação. `reagendar` recebe
+o mesmo contexto temporal; a operação recebe o valor, não uma função de relógio.
+
+Novos lembretes precisam de data e horário. Agendamentos novos ou alterados não
+podem estar no passado nem após o prazo recebido. Os enviados devem continuar
+presentes e inalterados; suas datas antigas não são rejeitadas como se fossem
+novos agendamentos. Alterações em lembretes existentes preservam seus identificadores.
+
+A operação valida o conjunto antes de aplicar as mudanças, preservando as regras
+de `add`, `remove` e `reagendar`. Uma rejeição mantém toda a configuração anterior
+intacta; não modifica outras turmas nem os registros históricos. Essa regra ainda
+precisará ser implementada e garantida na gravação em armazenamento.
+
+Exemplos para percorrer conceitualmente:
+
+| Situação proposta | Resultado esperado no domínio |
+| --- | --- |
+| Duas datas válidas e quantidade dois | Aceitar a configuração completa. |
+| Quantidade três com apenas duas datas preenchidas | Rejeitar; preservar a configuração anterior. |
+| Um novo agendamento passado ou após o prazo | Rejeitar; não aplicar parcialmente as outras mudanças. |
+| Reduzir três lembretes para dois, mantendo o enviado | Aceitar a remoção do não enviado e preservar os demais. |
+| Alterar ou excluir um enviado | Rejeitar; preservar o conjunto anterior. |
+| Reagendar um não enviado dentro dos limites | Preservar seu id e o isolamento entre turmas. |
+
+Esses exemplos cobrem regras de domínio presentes em cenários GUI. Não comprovam
+autenticação, navegação, mensagens, persistência ou testes executáveis aprovados.
+O contrato concreto do relógio e a origem de `prazoAcademico`, os estados ainda indefinidos, as notas
+pendentes, o processamento automático e a concorrência continuam pendentes.
+
+### Registro dos resultados de envio
+
+Nesta feature, cada `Notificacao` representa uma tentativa de envio realizada.
+`Lembrete Service` tem acesso a `HistoricoNotificacoes` para coordenar seu registro
+pela operação `registrar(Notificacao)`. A associação representa acesso ou referência;
+ela não define uma sequência de chamadas.
+
+`registrar` acrescenta a notificação sem substituir ou alterar os registros anteriores.
+Em uma falha, o registro preserva o resultado `Falha` e a descrição do erro. Se um
+reenvio for aceito pelo serviço de email, outra notificação registra `Enviado`.
+Os dois registros referenciam o mesmo lembrete de origem.
+
+| Acontecimento | Resultado esperado no histórico de tentativas |
+| --- | --- |
+| Uma tentativa é aceita pelo serviço de email | Acrescentar uma notificação com resultado Enviado. |
+| Uma tentativa falha | Acrescentar uma notificação com resultado Falha e descrição do erro. |
+| Um reenvio tem sucesso após uma falha | Preservar a falha e acrescentar o sucesso, ambos para o mesmo lembrete. |
+| Novos resultados são registrados | Preservar todos os registros anteriores. |
+| Um processamento não realiza tentativa de email | Não acrescentar uma notificação de tentativa; seu registro próprio continua pendente. |
+
+Assim, a parte de registro do cenário de reenvio pode ser explicada com duas
+notificações e um único lembrete enviado. `Enviado` significa aceitação pelo serviço
+de email, não confirmação de recebimento ou leitura pelo destinatário.
+
+O incremento detalha o registro no modelo; não implementa envio ou persistência.
+Continuam pendentes a identificação do professor e da turma no histórico, os detalhes
+históricos das pendências, o registro dos processamentos ignorados, os estados,
+a programação dos reenvios e a prevenção de duplicidade e concorrência.
+Portanto, ele não comprova o cenário completo de envio nem a consulta GUI.
+
+Há uma diferença de linguagem a validar: os cenários GUI usam motivo para o propósito
+do aviso, como "Notas pendentes", e descrição da falha para o erro; alguns cenários
+service usam motivo para a causa da falha. O modelo mantém seus atributos atuais,
+sem alterar os cenários nem considerar essa diferença resolvida.
 
 ## 8. Trabalhar em equipe com branches e PRs
 
@@ -195,15 +292,71 @@ e sua visualização, sem mudanças incidentais na aplicação.
 
 Quando houver alterações concorrentes, compare as mudanças nas classes e nas
 relações durante a resolução do conflito. Depois de resolvê-lo, abra o código final
-novamente no Mermaid Live e exporte uma imagem que corresponda a ele.
+novamente no Mermaid Live e gere uma imagem com legenda pelo procedimento abaixo.
 
 ## 9. Atualizar a imagem e revisar o resultado
 
-1. Cole a versão final do `.mmd` no Mermaid Live e confira a renderização.
-2. Abra **Actions**, escolha **PNG** e exporte a imagem.
-3. Salve-a como `docs/arquitetura/ddd-notificacoes-incremental.png` no seu clone.
-4. Confira se as novas caixas estão legíveis e se as relações esperadas aparecem.
-5. Inclua a fonte e a imagem correspondente no mesmo PR.
+1. Confira a fonte completa no Mermaid Live, incluindo o cabeçalho de configuração.
+2. Execute o exportador para gerar o PNG com a legenda incorporada.
+3. Abra o PNG e confira caixas, operações, relações e legibilidade do rodapé.
+4. Inclua a fonte e a imagem correspondente na revisão. Se editar o guia ou o
+   exportador, inclua esses arquivos também.
+
+### Preparar as ferramentas de exportação
+
+O script usa Python 3 com Pillow e Mermaid CLI 12.0.0 com seu navegador Puppeteer.
+São ferramentas de documentação; não alteram as dependências do cliente ou servidor.
+Não é necessário ter Codex. O exemplo abaixo é para Linux/macOS, executado na raiz
+do repositório, e mantém o ambiente Python em uma pasta irmã:
+
+```sh
+python3 -m venv ../ddd-export-python
+../ddd-export-python/bin/python -m pip install Pillow
+npx --yes --package @mermaid-js/mermaid-cli@12.0.0 -- \
+  ../ddd-export-python/bin/python scripts/exportar-modelo-ddd.py
+```
+
+O primeiro uso pode baixar as ferramentas e o navegador. Em outros sistemas,
+use o executável Python do ambiente criado. A fonte padrão da legenda é
+`DejaVuSans.ttf`; se não estiver disponível, informe uma fonte TrueType com
+suporte a português usando `--font /caminho/fonte.ttf`.
+
+### Usar ferramentas já instaladas
+
+Se `mmdc` e Pillow já estão disponíveis no ambiente:
+
+```sh
+python3 scripts/exportar-modelo-ddd.py
+```
+
+Para informar o executável Mermaid e uma configuração do navegador:
+
+```sh
+python3 scripts/exportar-modelo-ddd.py \
+  --mmdc /caminho/para/mmdc \
+  --puppeteer-config /caminho/para/puppeteer.json
+```
+
+O JSON do Puppeteer pode indicar um navegador instalado, por exemplo
+`{"executablePath": "/caminho/para/chrome"}`. Use os caminhos da sua máquina.
+O exportador não depende de caminhos temporários específicos.
+
+Por padrão, ele lê `docs/arquitetura/modelo-ddd.mmd` e grava
+`docs/arquitetura/ddd-notificacoes-incremental.png`, com largura de 6800 pixels.
+Também aceita `--input`, `--output`, `--width` e `--svg`; este último salva um SVG
+adicional do modelo, sem o rodapé, para inspeção. `--help` lista as opções.
+
+O rodapé é desenhado pelo exportador, sem modificar os pixels do diagrama
+renderizado. O PNG contém o SHA-256 da fonte em seus metadados para permitir
+conferir qual versão foi exportada. Para reproduzir a aparência, mantenha a
+mesma versão do Mermaid, navegador e fontes.
+
+### Exportação direta no Mermaid Live
+
+Em **Actions → PNG**, o Mermaid Live exporta o diagrama da fonte `.mmd`, sem a
+legenda adicional. Essa exportação é útil para prévias. Para atualizar o PNG
+versionado com o rodapé, use o script. A legenda não é parte do domínio e não
+deve ser simulada acrescentando classes ou associações artificiais ao `.mmd`.
 
 O código é a fonte oficial. A exportação pode variar visualmente entre versões
 do Mermaid; compare os conceitos e as relações, além da aparência.
