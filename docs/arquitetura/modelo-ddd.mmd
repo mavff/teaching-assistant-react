@@ -137,7 +137,8 @@ Notificacao --> Lembrete : origem
 %% Processar um lembrete não implica envio obrigatório.
 %% Classes permite acessar as turmas, suas configurações e os lembretes.
 %% Esta associação não define a busca por horários nem o início automático do processamento.
-LembreteService --> Classes
+%% A escrita invertida orienta o layout; o acesso continua de LembreteService para Classes.
+Classes <-- LembreteService
 LembreteService --> Lembrete
 LembreteService --> EmailSender
 
