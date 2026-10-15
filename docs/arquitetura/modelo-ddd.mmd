@@ -81,8 +81,16 @@ namespace Servidor {
     horário
     estado
   }
+  class LembreteService["Lembrete Service"] {
+    processar(Lembrete)
+  }
   class HistoricoNotificacoes
-  class Notificacao
+  class Notificacao {
+    dataHora
+    resultado
+    motivo
+    descricaoFalha
+  }
 }
 
 %% CLIENTE E INTERFACE: preserve as duas formas de acesso ao servidor.
@@ -124,9 +132,18 @@ Services --> HistoricoNotificacoes
 HistoricoNotificacoes *--> "*" Notificacao
 Notificacao --> Lembrete : origem
 
-%% Os campos de Notificacao serão definidos em conjunto.
-%% TentativaEnvio será modelada no próximo incremento.
-%% PROPOSTA PENDENTE, ainda não desenhada: GradeNotification --> Lembrete.
+%% PROCESSAMENTO DOS LEMBRETES: serviço de aplicação e associações de acesso.
+%% Processar um lembrete não implica envio obrigatório.
+LembreteService --> Lembrete
+LembreteService --> EmailSender
+
+%% Nesta feature, cada Notificacao registra uma tentativa de envio realizada.
+%% dataHora registra o momento da tentativa; motivo descreve o propósito do aviso.
+%% resultado é Enviado ou Falha; Enviado indica aceitação pelo serviço de email.
+%% descricaoFalha é preenchida quando houver falha.
+%% Um reenvio gera outra Notificacao para o mesmo Lembrete, preservando a anterior.
+%% TentativaEnvio não será acrescentada neste incremento.
+%% O registro de processamento ignorado e os detalhes históricos continuam pendentes.
 %% A relação de GradeNotification com EmailSender já existe na base.
 
 style Notificacao fill:#fff4cd,stroke:#93600c,stroke-width:2px
