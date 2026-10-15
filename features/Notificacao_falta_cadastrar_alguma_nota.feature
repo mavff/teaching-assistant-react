@@ -3,9 +3,9 @@
 # //parcial DDD: há elementos representados, mas faltam regras ou informações.
 # //pendente DDD: a decisão ou garantia principal ainda não está representada.
 # As marcações após # são comentários; não acrescentam tags ou passos.
-# Nos GUI, //ok considera turma, instante atual e prazo fornecidos como contexto.
-# Faltam a origem do prazo e a responsabilidade professor/turma; telas não são validadas.
-# Nos service, //ok considera o lembrete recebido já Enviado e processamento sequencial.
+# Nos GUI, //ok cobre as regras centrais descritas; telas e execução não são validadas.
+# A consulta de falha usa o contexto registrado; listagem e filtros do histórico continuam pendentes, sem RBAC.
+# Nos service, //ok considera as precondições do Given e processamento sequencial.
 # Evidências e lacunas: docs/arquitetura/COBERTURA-CENARIOS.md.
 
 Feature: Notificações de pendências no lançamento de notas
@@ -19,7 +19,7 @@ Feature: Notificações de pendências no lançamento de notas
 
    
    @gui # //parcial DDD
-   # DDD: Histórico e notificações existem; falta identificar o professor e limitar sua consulta.
+   # DDD: Nome do destinatário e turma estão registrados; faltam o contexto e a operação de listagem que selecionam apenas os registros do professor atual.
    Scenario: Visualização do próprio histórico de notificações
       Given o professor "Paulo Borba" está autenticado com o usuário "paulo.borba" e a senha "Paulo@2026!"
       And "Paulo Borba" está na tela "Turmas"
@@ -37,7 +37,7 @@ Feature: Notificações de pendências no lançamento de notas
 
   
    @gui # //parcial DDD
-   # DDD: Data, resultado, motivo e falha existem; faltam professor, turma, prazo e pendências preservados como eram na tentativa. A referência ao lembrete não substitui esses dados históricos.
+   # DDD: Consulta por id, nome do destinatário e turma registrada estão descritos; faltam prazo e pendências preservados como eram na tentativa. A referência ao lembrete não substitui esses dados históricos.
    Scenario: Visualização dos detalhes históricos de uma notificação
       Given o professor "Paulo Borba" está autenticado com o usuário "paulo.borba" e a senha "Paulo@2026!"
       And "Paulo Borba" está na tela "Histórico de notificações"
@@ -52,7 +52,7 @@ Feature: Notificações de pendências no lançamento de notas
 
    
    @gui # //pendente DDD
-   # DDD: Faltam os critérios e os vínculos históricos de professor, disciplina e turma para a filtragem.
+   # DDD: A turma registrada é textual; faltam os critérios de disciplina/turma e o contexto de seleção do histórico do professor para a filtragem.
    Scenario: Filtragem do próprio histórico por disciplina e turma
       Given o professor "Paulo Borba" está autenticado com o usuário "paulo.borba" e a senha "Paulo@2026!"
       And "Paulo Borba" está na tela "Histórico de notificações", sem filtros aplicados
@@ -68,8 +68,8 @@ Feature: Notificações de pendências no lançamento de notas
 
   
    
-   @gui # //parcial DDD
-   # DDD: Falha e descrição do erro estão representadas; faltam o contexto de professor/turma e a consulta completa.
+   @gui # //ok DDD (regra central)
+   # DDD: consultarDetalhesNotificacao usa buscar(idNotificacao) e devolve nomeDestinatario, turmaRegistrada, dataHora, motivo, resultado e descricaoFalha do registro selecionado, preservando a falha original e todos os dados.
    Scenario: Visualização de uma falha no próprio histórico
       Given o professor "Paulo Borba" está autenticado com o usuário "paulo.borba" e a senha "Paulo@2026!"
       And "Paulo Borba" está na tela "Histórico de notificações"
@@ -239,7 +239,7 @@ Feature: Notificações de pendências no lançamento de notas
 
 
    @gui # //pendente DDD
-   # DDD: Falta representar ou contratar a informação de responsabilidade do professor pela turma. Uma seta de acesso não representa autorização.
+   # DDD: Falta definir como o contexto do professor identifica suas turmas para configuração; isso não pressupõe autenticação ou RBAC.
    Scenario: Restrição de configuração de lembretes às próprias turmas
       Given o professor "Paulo Borba" está autenticado com o usuário "paulo.borba" e a senha "Paulo@2026!"
       And "Paulo Borba" está na tela "Turmas"
@@ -257,7 +257,7 @@ Feature: Notificações de pendências no lançamento de notas
 
 
    @service # //parcial DDD
-   # DDD: Aceitação, registro e marcação Enviado estão descritos; faltam identificação das pendências, destinatário, prazo e contrato concreto de envio.
+   # DDD: Verificação do prazo antes da tentativa, aceitação, registro e marcação Enviado estão descritos; faltam identificação das pendências, endereço do destinatário e contrato concreto de envio.
    Scenario: Envio de lembrete com notas pendentes
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui os alunos matriculados "João da Silva" e "Maria Souza"
@@ -322,7 +322,7 @@ Feature: Notificações de pendências no lançamento de notas
 
 
    @service # //parcial DDD
-   # DDD: Configurações e lembretes são separados por turma; faltam a seleção, os dados do professor e as pendências usadas em cada envio.
+   # DDD: A busca fica restrita à configuração da turma indicada; faltam o endereço do destinatário, as pendências e as condições completas de cada envio.
    Scenario: Envio independente de lembretes para múltiplas turmas
       Given o professor "Paulo Borba" é responsável pelas turmas "2026.2 de ESS" e "2026.2 de Introdução a Programação" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
@@ -342,8 +342,8 @@ Feature: Notificações de pendências no lançamento de notas
 
 
 
-   @service # //pendente DDD
-   # DDD: Falta definir a busca e a rejeição de solicitação quando não existe lembrete para a turma e o horário.
+   @service # //ok DDD (regra central)
+   # DDD: processarAgendados consulta buscarLembretesPara na configuração da turma; lista vazia rejeita a solicitação sem email ou tentativa, preservando prazo, lembretes e histórico.
    Scenario: Bloqueio de envio de lembrete não agendado
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui o aluno matriculado "João da Silva", sem nota cadastrada em "Prova de SOLID e Padrões de Projeto", realizada em "18/08/2026 às 14:00"
@@ -361,8 +361,8 @@ Feature: Notificações de pendências no lançamento de notas
 
 
 
-   @service # //parcial DDD
-   # DDD: A configuração rejeita agendamento posterior ao prazo; a condição de prazo já encerrado e seu motivo específico ainda não foram detalhados como entrada de criação.
+   @service # //ok DDD (regra central)
+   # DDD: Class.prazoEncerrado verifica o instante do serviço; configurarLembretes rejeita criação com o motivo Prazo acadêmico encerrado, sem alterar configuração, enviados ou histórico nem solicitar email.
    Scenario: Bloqueio de criação de novo lembrete após o prazo acadêmico
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui o aluno matriculado "João da Silva", sem nota cadastrada em "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
@@ -496,8 +496,8 @@ Feature: Notificações de pendências no lançamento de notas
 
 
 
-   @service # //pendente DDD
-   # DDD: Faltam verificação do prazo no processamento, transição para Cancelado com motivo e interrupção dos reenvios programados.
+   @service # //parcial DDD
+   # DDD: processar verifica o prazo antes da tentativa e retorna Prazo acadêmico encerrado, sem email ou novo registro, preservando o estado e o histórico; faltam transição para Cancelado, preservação do motivo e interrupção dos reenvios programados.
    Scenario: Interrupção dos reenvios após o prazo acadêmico
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"

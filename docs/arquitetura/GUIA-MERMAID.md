@@ -188,6 +188,108 @@ Quando outra equipe ainda não disponibiliza uma dependência, combine seu contr
 e os dados necessários para um mock/stub. Não trate esse dado simulado como uma
 funcionalidade já implementada no projeto.
 
+### Prazo acadêmico da turma e rejeição de criação
+
+`Class` passa a representar `prazoAcademico`, utilizado pela configuração dos
+lembretes daquela turma. Ano e semestre não substituem essa informação. O prazo
+não existe no código atual do servidor ou nos tipos do cliente; este incremento
+acrescenta o conceito ao modelo, sem implementar seu cadastro na aplicação.
+
+`Class.prazoEncerrado(instanteAtual)` retorna verdadeiro somente quando o instante
+recebido é posterior ao prazo. A consulta não modifica dados, consulta o relógio
+ou envia email. A igualdade com o prazo retorna falso; as demais validações da
+configuração continuam necessárias.
+
+`Services.configurarLembretes()` acessa a turma por `Classes` e consulta o relógio
+do servidor uma vez. O prazo da mesma `Class` e o instante obtido são fornecidos
+às operações de configuração e reagendamento. O professor não informa o instante
+atual. O procedimento de cadastro do prazo continua fora deste incremento.
+
+Se a proposta incluir um novo lembrete e o prazo já estiver encerrado, o serviço
+rejeita a criação com o motivo **Prazo acadêmico encerrado**, antes de aplicar a
+proposta. Preserva a turma, o prazo, a configuração, os lembretes enviados e o
+histórico. Não cria o lembrete, não solicita email e não registra tentativa de envio.
+Essa regra não acrescenta restrições a propostas sem novos lembretes.
+
+| Situação | Resultado esperado no modelo |
+| --- | --- |
+| Instante atual anterior ao prazo | `prazoEncerrado` retorna falso; continuam necessárias as outras validações. |
+| Instante atual exatamente igual ao prazo | Retorna falso, sem alterar dados. |
+| Prazo 31/08/2026 às 23:59, criação solicitada em 01/09/2026 às 08:00 | Retorna verdadeiro; rejeitar a criação com o motivo definido, preservando o enviado existente e o histórico. |
+
+O último percurso representa a regra central do cenário service **Bloqueio de
+criação de novo lembrete após o prazo acadêmico**. O bloqueio durante o processamento
+é detalhado a seguir; a transição para Cancelado continua pendente.
+
+### Bloqueio por prazo antes de cada tentativa
+
+`Lembrete Service.processar(Lembrete)` coordena a verificação do prazo tanto na
+primeira tentativa quanto nos reenvios que passam por essa operação:
+
+1. Consultar `jaFoiEnviado()`; se verdadeiro, encerrar como já previsto.
+2. Acessar a turma correspondente por `Classes` e obter uma vez o instante atual
+   consultando o relógio do servidor.
+3. Antes de solicitar email, consultar `Class.prazoEncerrado(instanteAtual)`.
+4. Se verdadeiro, encerrar e informar **Prazo acadêmico encerrado** como resultado
+   do processamento, sem solicitar email, registrar tentativa ou alterar os dados.
+5. Se falso, continuar com as demais verificações necessárias ao envio.
+
+O bloqueio preserva a turma, o prazo, a configuração, o identificador, a data, o
+horário e o estado do lembrete, além de todas as notificações anteriores. Não
+marca o lembrete como Enviado. Um Enviado continua protegido pela primeira
+verificação, mesmo quando o prazo já encerrou.
+
+A explicação é um resultado do serviço, não uma falha de envio de email. Ela não
+é armazenada em um novo atributo do lembrete nem cria uma notificação de tentativa.
+Não são acrescentados `motivoCancelamento`, `proximoReenvioEm`, operações ou relações.
+
+| Contexto | Resultado esperado no modelo |
+| --- | --- |
+| Prazo 31/08/2026 às 23:59 e reenvio processado em 01/09/2026 às 00:00, com três falhas anteriores | Bloquear antes de EmailSender, informar Prazo acadêmico encerrado e preservar as três tentativas e o estado anterior do lembrete. |
+| Primeira tentativa processada após o prazo | Aplicar o mesmo bloqueio sem email, tentativa ou alteração dos dados. |
+| Instante atual anterior ou exatamente igual ao prazo | A consulta retorna falso; continuar com as outras verificações, sem presumir envio permitido. |
+| Lembrete já Enviado é processado novamente após o prazo | Encerrar na primeira verificação, preservando o Enviado e seu histórico. |
+
+O cenário **Interrupção dos reenvios após o prazo acadêmico** fica **parcial**:
+o bloqueio e a preservação das tentativas estão descritos, mas ainda faltam a
+transição para Cancelado, a preservação do motivo e o controle que encerra os
+reenvios programados. Esses resultados não são garantidos por retornar uma mensagem
+nem por `remove(Lembrete)`. A marcação `//ok` depende de resolver essas lacunas.
+
+### Localização dos lembretes por agendamento
+
+`ConfiguracaoLembretes.buscarLembretesPara(data, horario)` retorna uma lista dos
+lembretes com exatamente aquela data e horário, restrita à configuração consultada.
+É uma consulta: preserva objetos, estados e histórico, sem criar lembrete ou
+solicitar email. A lista pode estar vazia ou conter vários lembretes; não foi
+definida uma regra de exclusividade de data e horário. A busca não filtra estados
+nem unifica `Não enviado` com `Agendado`.
+
+`Lembrete Service.processarAgendados(turma, data, horario)` é a entrada conceitual
+para uma solicitação por turma e agendamento. Pelas associações existentes com
+`Classes`, suas turmas e configurações, o serviço acessa a configuração da turma
+indicada e realiza a consulta. Não é necessário acrescentar relações ao diagrama.
+
+| Resultado da busca | Coordenação esperada |
+| --- | --- |
+| Nenhum lembrete corresponde à turma, data e horário | Rejeitar a solicitação por inexistência do lembrete agendado; preservar turma, prazo, configuração, lembretes e histórico, sem solicitar email ou registrar tentativa. |
+| Um ou vários lembretes correspondem | Encaminhar cada um a `processar(Lembrete)`; a correspondência não dispensa as condições de processamento nem obriga envio. |
+| Um dos correspondentes já está Enviado | O bloqueio existente de `processar` preserva esse lembrete e seu histórico, sem outra tentativa. |
+| Outra turma possui lembrete na mesma data e horário | Esse lembrete não participa da consulta da turma solicitada. |
+
+Os parâmetros identificam o agendamento solicitado, não o momento atual: uma
+solicitação atrasada ainda pode referenciar o agendamento original. A busca não
+consulta o relógio para substituir esses parâmetros. A entrada não cria um
+agendador automático; seu disparo, a seleção de vencidos, os reenvios e a
+concorrência continuam pendentes.
+
+A lista vazia representa a regra central do cenário service **Bloqueio de envio
+de lembrete não agendado**. Os dois bloqueios de reprocessamento de enviados
+permanecem representados. Este incremento não acrescenta Professor, autenticação
+ou RBAC. O nome do destinatário e a turma no registro são detalhados na consulta
+de falha abaixo; a obtenção do endereço de email e os demais detalhes históricos
+continuam pendentes.
+
 ### Atualização completa da configuração de lembretes
 
 `Services.configurarLembretes()` continua sendo a entrada conceitual da aplicação.
@@ -227,9 +329,10 @@ Exemplos para percorrer conceitualmente:
 | Reagendar um não enviado dentro dos limites | Preservar seu id e o isolamento entre turmas. |
 
 Esses exemplos cobrem regras de domínio presentes em cenários GUI. Não comprovam
-autenticação, navegação, mensagens, persistência ou testes executáveis aprovados.
-O contrato concreto do relógio e a origem de `prazoAcademico`, os estados ainda indefinidos, as notas
-pendentes, o processamento automático e a concorrência continuam pendentes.
+navegação, mensagens, persistência ou testes executáveis aprovados. Autenticação e
+RBAC não fazem parte do escopo acordado. O prazo pertence a `Class`; o contrato
+concreto do relógio, os estados ainda indefinidos, as notas pendentes, o
+processamento automático e a concorrência continuam pendentes.
 
 ### Registro dos resultados de envio
 
@@ -256,16 +359,72 @@ notificações e um único lembrete enviado. `Enviado` significa aceitação pel
 de email, não confirmação de recebimento ou leitura pelo destinatário.
 
 O incremento detalha o registro no modelo; não implementa envio ou persistência.
-Continuam pendentes a identificação do professor e da turma no histórico, os detalhes
-históricos das pendências, o registro dos processamentos ignorados, as demais transições de estado,
+O nome do destinatário e a identificação textual da turma são preservados como
+detalhado a seguir. Continuam pendentes a seleção da lista por professor, o prazo
+e as pendências históricos, o registro dos processamentos ignorados, as demais transições de estado,
 a programação dos reenvios e as garantias contra duplicidade por concorrência ou
 falha entre envio e gravação.
-Portanto, ele não comprova o cenário completo de envio nem a consulta GUI.
+O registro isolado não comprova o cenário completo de envio; a consulta da falha
+é detalhada no próximo recorte.
 
 Há uma diferença de linguagem a validar: os cenários GUI usam motivo para o propósito
 do aviso, como "Notas pendentes", e descrição da falha para o erro; alguns cenários
 service usam motivo para a causa da falha. O modelo mantém seus atributos atuais,
 sem alterar os cenários nem considerar essa diferença resolvida.
+
+### Identificação da tentativa e consulta de uma falha
+
+`Notificacao` acrescenta três dados ao registro da tentativa:
+
+| Dado | Significado |
+| --- | --- |
+| `id` | Identifica aquele registro, permanecendo estável após sua criação. Cada nova tentativa recebe outro identificador. |
+| `nomeDestinatario` | Nome registrado na tentativa; nesta feature, é o nome do professor. |
+| `turmaRegistrada` | Identificação textual da turma no momento da tentativa, como 2026.2 de ESS. |
+
+Os dados de contexto são copiados para o registro, não consultados novamente na
+turma atual para montar o histórico. Mudar o nome do destinatário ou a identificação
+atual da turma preserva os valores da notificação antiga. Prazo e pendências
+históricos ainda não são acrescentados neste incremento.
+
+O `id` da notificação identifica uma tentativa, enquanto o `id` do lembrete
+identifica o aviso agendado. Uma falha e seu reenvio aceito têm identificadores
+de notificação distintos, mesmo quando correspondem ao mesmo lembrete ou aparecem
+com igual data e horário. O identificador próprio é uma escolha de projeto para
+evitar seleção ambígua; seu formato e geração técnica não são fixados no modelo.
+
+`HistoricoNotificacoes.buscar(idNotificacao)` consulta o histórico considerado
+no contexto atual e devolve o registro com esse identificador ou indica ausência.
+`Services.consultarDetalhesNotificacao(idNotificacao)` coordena essa busca pelas
+associações já existentes e devolve os seis dados do cenário: nome do destinatário,
+turma registrada, data/hora, motivo, resultado e descrição da falha. A seleção do
+registro corresponde ao uso de seu identificador; transporte e endpoints não são
+definidos por este diagrama.
+
+Uma consulta preserva todos os registros e estados, sem solicitar email ou
+executar reenvio. Um identificador inexistente indica ausência, sem criar uma
+notificação substituta. A consulta do registro antigo não é redirecionada ao
+sucesso mais recente do mesmo lembrete.
+
+| Percurso conceitual | Resultado esperado |
+| --- | --- |
+| Selecionar o id da falha de Paulo Borba em 23/08/2026 às 09:00 | Obter Paulo Borba, 2026.2 de ESS, a data/hora, Notas pendentes, Falha e Tempo limite excedido no envio. |
+| Duas tentativas têm a mesma data e horário | Seus ids distintos permitem consultar exatamente a escolhida. |
+| Acrescentar um reenvio Enviado após uma Falha | Preservar a falha e sua descrição; cada consulta por id devolve o respectivo registro. |
+| A identificação atual da turma muda após a tentativa | A consulta continua devolvendo a turma registrada naquela tentativa. |
+| Consultar um id inexistente | Indicar ausência e preservar o histórico. |
+
+Esses percursos representam a regra central de **Visualização de uma falha no
+próprio histórico**. Consideram o registro dado pelo cenário e o professor já
+conhecido no contexto do sistema. A listagem e os filtros por professor, disciplina
+e turma permanecem pendentes; o nome registrado não define uma regra de identidade
+ou seleção de professores. Não são acrescentados entidade Professor, autenticação
+ou RBAC. A notificação continua disponível às outras features, sem exigir que
+todas tenham um lembrete como origem.
+
+O incremento é conceitual. A marcação GUI não comprova navegação, persistência ou
+testes da aplicação. O cenário de detalhes históricos continua parcial porque
+ainda exige prazo e pendências preservados como eram na tentativa.
 
 ### Bloqueio de reprocessamento de lembrete já enviado
 
@@ -343,7 +502,8 @@ A coordenação descrita não define uma transação atômica entre email, estad
 histórico. Permanecem pendentes os contratos concretos de envio, a identificação
 das pendências e do professor, o agendamento dos reenvios, a persistência e a
 concorrência. Registrar uma falha não garante que outra tentativa será programada.
-Não acrescentamos contadores, atributos, entidades ou relações neste incremento.
+O detalhamento da marcação de envio não acrescenta contadores, atributos,
+entidades ou relações; os dados da consulta são descritos em seu próprio recorte.
 
 ## 8. Trabalhar em equipe com branches e PRs
 
