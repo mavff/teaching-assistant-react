@@ -178,6 +178,9 @@ primeiro discuta com a equipe como cada informação deve ser representada.
 
 Um caminho de setas não prova que o cenário funciona. A análise do diagrama é
 conceitual; os testes da futura implementação precisam comprovar suas regras.
+O acompanhamento dos 26 cenários de lembretes está em
+[COBERTURA-CENARIOS.md](COBERTURA-CENARIOS.md), separando regras representadas,
+lacunas e resultados de descoberta dos testes.
 Quando outra equipe ainda não disponibiliza uma dependência, combine seu contrato
 e os dados necessários para um mock/stub. Não trate esse dado simulado como uma
 funcionalidade já implementada no projeto.
@@ -251,14 +254,93 @@ de email, não confirmação de recebimento ou leitura pelo destinatário.
 
 O incremento detalha o registro no modelo; não implementa envio ou persistência.
 Continuam pendentes a identificação do professor e da turma no histórico, os detalhes
-históricos das pendências, o registro dos processamentos ignorados, os estados,
-a programação dos reenvios e a prevenção de duplicidade e concorrência.
+históricos das pendências, o registro dos processamentos ignorados, as demais transições de estado,
+a programação dos reenvios e as garantias contra duplicidade por concorrência ou
+falha entre envio e gravação.
 Portanto, ele não comprova o cenário completo de envio nem a consulta GUI.
 
 Há uma diferença de linguagem a validar: os cenários GUI usam motivo para o propósito
 do aviso, como "Notas pendentes", e descrição da falha para o erro; alguns cenários
 service usam motivo para a causa da falha. O modelo mantém seus atributos atuais,
 sem alterar os cenários nem considerar essa diferença resolvida.
+
+### Bloqueio de reprocessamento de lembrete já enviado
+
+`Lembrete.jaFoiEnviado()` retorna um booleano: verdadeiro quando seu estado é
+`Enviado` e falso nos demais casos. A consulta não modifica identificador,
+agendamento, estado ou histórico; também não consulta o relógio nem envia email.
+
+Em `Lembrete Service`, `processar(Lembrete)` verifica essa condição antes de
+qualquer tentativa de email. Se o lembrete já foi enviado, o processamento
+encerra sem nova solicitação ao `EmailSender`, sem acrescentar outra notificação
+de tentativa e sem programar novo reenvio. O lembrete e todos os registros
+anteriores são preservados.
+
+Falso significa somente que o lembrete ainda não está no estado `Enviado`.
+Não é uma autorização para enviar: agendamento, prazo, pendências e demais
+estados continuam exigindo suas próprias verificações. A consulta não muda o
+estado nem unifica `Não enviado` com `Agendado`. A marcação de envio descrita
+a seguir é uma operação distinta da consulta.
+
+Exemplos para percorrer conceitualmente:
+
+| Situação inicial | Consulta e resultado esperado |
+| --- | --- |
+| Lembrete Enviado, com uma notificação de sucesso, é processado novamente | Retornar verdadeiro; encerrar sem email ou outra tentativa; preservar a notificação existente. |
+| Lembrete Enviado, com uma falha e um sucesso registrados, recebe reenvio atrasado | Retornar verdadeiro; preservar os dois registros; não enviar, registrar terceira tentativa ou programar novo reenvio. |
+| Lembrete não está Enviado | Retornar falso; a consulta não altera o estado ou o histórico e não realiza envio por conta própria. |
+
+Esses percursos explicitam a regra dos cenários service "Prevenção de envio
+duplicado por reprocessamento de lembrete já enviado" e "Bloqueio de novo reenvio
+após sucesso de tentativa anterior". Não são testes executáveis aprovados e não
+validam navegação GUI.
+
+A regra considera o estado do lembrete recebido pelo serviço. Carregamento,
+persistência e concorrência continuam pendentes: duas execuções podem observar
+um estado ainda não enviado, e a aceitação do email pode ocorrer antes de uma
+falha de gravação. A consulta, isoladamente, não garante ausência de duplicidade
+nesses casos. O registro próprio de processamentos sem tentativa de email
+também continua pendente.
+
+### Marcação de envio aceito e preservação das falhas
+
+`Lembrete.marcarComoEnviado()` permite passar de `Não enviado` ou `Agendado`
+para `Enviado`, preservando identificador, data e horário. Os dois nomes de
+origem continuam sem unificação ou renomeação dos cenários. Se o lembrete já
+estiver `Enviado`, a operação preserva o objeto sem outra alteração. Em
+`Ignorado`, `Cancelado` ou outra condição não admitida, a marcação é rejeitada
+e os dados anteriores são preservados.
+
+A operação modifica somente o estado do lembrete. `Lembrete Service` continua
+coordenando email e histórico: após o serviço de email aceitar uma tentativa
+válida, coordena o registro de uma nova `Notificacao` com resultado `Enviado`
+e chama `marcarComoEnviado()` no mesmo lembrete. `Enviado` continua significando
+aceitação pelo serviço de email, sem confirmação de recebimento ou leitura.
+
+Se a tentativa falhar, o serviço coordena o registro de uma nova `Notificacao`
+com resultado `Falha` e descrição do erro, preservando os registros anteriores.
+O lembrete mantém exatamente seu estado anterior de aguardando envio; não
+acrescentamos um estado `Falha` ao lembrete. A falha fica representada na
+notificação daquela tentativa.
+
+Exemplos para percorrer conceitualmente:
+
+| Situação | Resultado esperado no modelo |
+| --- | --- |
+| Primeira tentativa aceita para um lembrete Não enviado ou Agendado | Registrar uma notificação Enviado e marcar o mesmo lembrete como Enviado, preservando id e agendamento; `jaFoiEnviado()` passa a retornar verdadeiro. |
+| Uma tentativa válida falha | Registrar uma notificação Falha; preservar o estado anterior de aguardando envio; a consulta continua retornando falso. |
+| Uma falha é seguida por uma tentativa aceita | Preservar a falha e acrescentar o sucesso para o mesmo lembrete; ele passa a Enviado e é contabilizado como um único lembrete enviado. |
+| Lembrete já Enviado recebe chamadas repetidas | `processar` encerra sem novo email ou registro; uma chamada direta de `marcarComoEnviado()` preserva o objeto sem outra alteração. |
+| Marcação solicitada para Ignorado, Cancelado ou outra condição não admitida | Rejeitar sem alterar estado, identificador ou agendamento. |
+
+Os percursos detalham partes dos cenários service de envio, reenvio e bloqueio
+de reprocessamento. Não são testes executáveis aprovados nem validam navegação GUI.
+
+A coordenação descrita não define uma transação atômica entre email, estado e
+histórico. Permanecem pendentes os contratos concretos de envio, a identificação
+das pendências e do professor, o agendamento dos reenvios, a persistência e a
+concorrência. Registrar uma falha não garante que outra tentativa será programada.
+Não acrescentamos contadores, atributos, entidades ou relações neste incremento.
 
 ## 8. Trabalhar em equipe com branches e PRs
 

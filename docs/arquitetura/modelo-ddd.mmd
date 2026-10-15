@@ -85,6 +85,8 @@ namespace Servidor {
     horário
     estado
     reagendar(novaData, novoHorario, instanteAtual, prazoAcademico)
+    jaFoiEnviado() boolean
+    marcarComoEnviado()
   }
   class LembreteService["Lembrete Service"] {
     processar(Lembrete)
@@ -155,6 +157,31 @@ HistoricoNotificacoes <-- LembreteService
 %% Um novo lembrete recebe outra identidade; formato e geração do id ainda não estão definidos.
 %% O id permite reconhecer o mesmo lembrete, mas não garante prevenção de duplicidade.
 
+%% BLOQUEIO DE REPROCESSAMENTO: jaFoiEnviado retorna verdadeiro quando estado é Enviado.
+%% A consulta não altera o Lembrete, não consulta o relógio e não realiza envio.
+%% LembreteService.processar consulta essa condição antes de qualquer tentativa de email.
+%% Se verdadeiro, encerra sem acessar EmailSender para enviar, sem registrar outra Notificacao
+%% de tentativa e sem programar novo reenvio; preserva o Lembrete e todo o histórico.
+%% Falso significa apenas que o estado não é Enviado; não autoriza automaticamente o envio.
+%% Agendamento, prazo, pendências e demais estados continuam exigindo suas próprias verificações.
+%% Não enviado e Agendado continuam sem unificação por este incremento.
+%% A regra usa o estado do Lembrete recebido; carregamento, persistência e concorrência não são definidos aqui.
+%% Falhas entre aceitação do email e gravação continuam pendentes.
+
+%% MARCAÇÃO DE ENVIO ACEITO: marcarComoEnviado permite Não enviado ou Agendado passar para Enviado.
+%% Preservar id, data e horário; os nomes Não enviado e Agendado continuam sem unificação.
+%% Se já estiver Enviado, preservar o objeto sem outra alteração.
+%% Rejeitar a marcação em Ignorado, Cancelado ou outra condição não admitida, sem modificar o Lembrete.
+%% A operação altera apenas o estado: não envia email, não registra Notificacao e não programa reenvio.
+%% Após aceitação do email, LembreteService coordena registrar uma nova Notificacao Enviado
+%% e chamar marcarComoEnviado no mesmo Lembrete.
+%% Se uma tentativa válida falhar, o serviço coordena registrar uma nova Notificacao Falha,
+%% preservando as anteriores e o estado anterior de aguardando envio do Lembrete.
+%% Falha é resultado da Notificacao; este incremento não acrescenta estado Falha ao Lembrete.
+%% Falha seguida de sucesso preserva dois registros para o mesmo Lembrete, contabilizado como um enviado.
+%% Esta coordenação não define atomicidade entre email, estado e histórico nem acrescenta contadores.
+%% Programação de reenvios, persistência e concorrência continuam pendentes.
+
 %% REAGENDAMENTO: operação de negócio do Lembrete, preservando seu id.
 %% Rejeitar alteração de lembrete Enviado, novo agendamento anterior a instanteAtual
 %% ou posterior ao prazoAcademico recebido pela operação.
@@ -167,7 +194,7 @@ HistoricoNotificacoes <-- LembreteService
 %% Lembretes Enviados são preservados; uma remoção rejeitada mantém a configuração intacta.
 %% A remoção preserva os demais lembretes e os registros históricos.
 %% A redução de quantidade é representada pela remoção, sem novo atributo de quantidade.
-%% Alterações e remoções nos estados Falha, Ignorado e Cancelado ainda serão discutidas.
+%% Alterações e remoções nos estados Ignorado e Cancelado ainda serão discutidas.
 %% Não enviado e Agendado não são unificados por este incremento.
 
 %% ATUALIZAÇÃO COMPLETA: atualizar recebe a proposta do conjunto final antes de alterar a configuração.
@@ -195,7 +222,8 @@ HistoricoNotificacoes <-- LembreteService
 %% Os dois registros podem referenciar o mesmo Lembrete, sem representar dois lembretes enviados.
 %% Esta associação indica acesso; não define sequência de chamadas nem persistência.
 %% Processar sem tentativa de email não gera uma Notificacao de tentativa.
-%% Seleção do histórico por professor, estados, programação de reenvios e duplicidade continuam pendentes.
+%% Seleção do histórico por professor, demais transições de estado, programação de reenvios
+%% e garantias contra duplicidade por concorrência ou falha de gravação continuam pendentes.
 %% TentativaEnvio não será acrescentada neste incremento.
 %% O registro de processamento ignorado e os detalhes históricos continuam pendentes.
 %% Os cenários usam motivo tanto para o propósito do aviso quanto para a causa da falha.
