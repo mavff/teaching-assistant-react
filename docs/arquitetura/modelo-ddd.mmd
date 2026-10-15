@@ -89,7 +89,9 @@ namespace Servidor {
   class LembreteService["Lembrete Service"] {
     processar(Lembrete)
   }
-  class HistoricoNotificacoes
+  class HistoricoNotificacoes {
+    registrar(Notificacao)
+  }
   class Notificacao {
     dataHora
     resultado
@@ -113,6 +115,8 @@ HistoricoNotificacoesCliente --> EmailService
 EmailService --> Interface
 
 %% BASE DO SERVIDOR: relações do diagrama original.
+%% A ordem desta declaração orienta apenas a apresentação, sem mudar seus extremos.
+Student "1" *--o "*" Enrolment : enrolments / student
 Services --> StudentListImport
 Services --> StudentList
 Services --> GradesImportService
@@ -122,7 +126,6 @@ StudentList *--> "*" Student
 GradesImportService --> Classes
 Classes *--> "*" Class
 Class *--> "*" Enrolment
-Student "1" *--o "*" Enrolment : enrolments / student
 GradeNotification o--> "*" Enrolment
 Enrolment *--> "*" Evaluation : auto-evaluations
 Enrolment *--> "*" Evaluation : evaluations
@@ -145,6 +148,8 @@ Notificacao --> Lembrete : origem
 Classes <-- LembreteService
 LembreteService --> Lembrete
 LembreteService --> EmailSender
+%% A escrita invertida mantém o acesso de LembreteService ao histórico.
+HistoricoNotificacoes <-- LembreteService
 
 %% IDENTIDADE DO LEMBRETE: alterar data ou horário preserva seu id.
 %% Um novo lembrete recebe outra identidade; formato e geração do id ainda não estão definidos.
@@ -184,8 +189,17 @@ LembreteService --> EmailSender
 %% resultado é Enviado ou Falha; Enviado indica aceitação pelo serviço de email.
 %% descricaoFalha é preenchida quando houver falha.
 %% Um reenvio gera outra Notificacao para o mesmo Lembrete, preservando a anterior.
+%% REGISTRO DOS RESULTADOS: o LembreteService coordena o registro de cada tentativa realizada.
+%% HistoricoNotificacoes.registrar acrescenta a Notificacao sem substituir ou alterar registros anteriores.
+%% Uma falha mantém resultado Falha e descricaoFalha; um reenvio aceito gera outro registro Enviado.
+%% Os dois registros podem referenciar o mesmo Lembrete, sem representar dois lembretes enviados.
+%% Esta associação indica acesso; não define sequência de chamadas nem persistência.
+%% Processar sem tentativa de email não gera uma Notificacao de tentativa.
+%% Seleção do histórico por professor, estados, programação de reenvios e duplicidade continuam pendentes.
 %% TentativaEnvio não será acrescentada neste incremento.
 %% O registro de processamento ignorado e os detalhes históricos continuam pendentes.
+%% Os cenários usam motivo tanto para o propósito do aviso quanto para a causa da falha.
+%% Essa diferença de linguagem precisa de validação; os cenários não são reinterpretados aqui.
 %% A relação de GradeNotification com EmailSender já existe na base.
 
 style Notificacao fill:#fff4cd,stroke:#93600c,stroke-width:2px

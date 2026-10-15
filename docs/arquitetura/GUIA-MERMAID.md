@@ -225,6 +225,41 @@ autenticação, navegação, mensagens, persistência ou testes executáveis apr
 O contrato concreto do relógio e a origem de `prazoAcademico`, os estados ainda indefinidos, as notas
 pendentes, o processamento automático e a concorrência continuam pendentes.
 
+### Registro dos resultados de envio
+
+Nesta feature, cada `Notificacao` representa uma tentativa de envio realizada.
+`Lembrete Service` tem acesso a `HistoricoNotificacoes` para coordenar seu registro
+pela operação `registrar(Notificacao)`. A associação representa acesso ou referência;
+ela não define uma sequência de chamadas.
+
+`registrar` acrescenta a notificação sem substituir ou alterar os registros anteriores.
+Em uma falha, o registro preserva o resultado `Falha` e a descrição do erro. Se um
+reenvio for aceito pelo serviço de email, outra notificação registra `Enviado`.
+Os dois registros referenciam o mesmo lembrete de origem.
+
+| Acontecimento | Resultado esperado no histórico de tentativas |
+| --- | --- |
+| Uma tentativa é aceita pelo serviço de email | Acrescentar uma notificação com resultado Enviado. |
+| Uma tentativa falha | Acrescentar uma notificação com resultado Falha e descrição do erro. |
+| Um reenvio tem sucesso após uma falha | Preservar a falha e acrescentar o sucesso, ambos para o mesmo lembrete. |
+| Novos resultados são registrados | Preservar todos os registros anteriores. |
+| Um processamento não realiza tentativa de email | Não acrescentar uma notificação de tentativa; seu registro próprio continua pendente. |
+
+Assim, a parte de registro do cenário de reenvio pode ser explicada com duas
+notificações e um único lembrete enviado. `Enviado` significa aceitação pelo serviço
+de email, não confirmação de recebimento ou leitura pelo destinatário.
+
+O incremento detalha o registro no modelo; não implementa envio ou persistência.
+Continuam pendentes a identificação do professor e da turma no histórico, os detalhes
+históricos das pendências, o registro dos processamentos ignorados, os estados,
+a programação dos reenvios e a prevenção de duplicidade e concorrência.
+Portanto, ele não comprova o cenário completo de envio nem a consulta GUI.
+
+Há uma diferença de linguagem a validar: os cenários GUI usam motivo para o propósito
+do aviso, como "Notas pendentes", e descrição da falha para o erro; alguns cenários
+service usam motivo para a causa da falha. O modelo mantém seus atributos atuais,
+sem alterar os cenários nem considerar essa diferença resolvida.
+
 ## 8. Trabalhar em equipe com branches e PRs
 
 Enquanto o modelo estiver na branch `docs/modelo-ddd-incremental`, crie sua branch
