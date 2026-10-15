@@ -77,6 +77,7 @@ namespace Servidor {
     add(Lembrete)
   }
   class Lembrete {
+    id
     data
     horário
     estado
@@ -134,8 +135,15 @@ Notificacao --> Lembrete : origem
 
 %% PROCESSAMENTO DOS LEMBRETES: serviço de aplicação e associações de acesso.
 %% Processar um lembrete não implica envio obrigatório.
+%% Classes permite acessar as turmas, suas configurações e os lembretes.
+%% Esta associação não define a busca por horários nem o início automático do processamento.
+LembreteService --> Classes
 LembreteService --> Lembrete
 LembreteService --> EmailSender
+
+%% IDENTIDADE DO LEMBRETE: alterar data ou horário preserva seu id.
+%% Um novo lembrete recebe outra identidade; formato e geração do id ainda não estão definidos.
+%% O id permite reconhecer o mesmo lembrete, mas não garante prevenção de duplicidade.
 
 %% Nesta feature, cada Notificacao registra uma tentativa de envio realizada.
 %% dataHora registra o momento da tentativa; motivo descreve o propósito do aviso.
