@@ -248,8 +248,8 @@ Feature: Notificações de pendências no lançamento de notas
 
 
 
-   @service # //parcial DDD
-   # DDD: Sem pendências, ignorar o Lembrete e registrar Notificacao Ignorado por registrar/listar existentes, com motivo Nenhuma nota pendente, descricaoFalha vazia e pendenciasRegistradas vazia; tentativas incluem só Enviado/Falha e preservam a última de 20/08; falta validar Não enviado/Agendado do lembrete futuro.
+   @service # //ok DDD (regra central)
+   # DDD: Sem pendências, ignorar o Lembrete e registrar Notificacao Ignorado pelos métodos existentes, sem email ou nova tentativa; a última tentativa continua Enviado de 20/08 e o lembrete futuro de 29/08 permanece Não enviado, conforme a correção aprovada.
    Scenario: Ausência de envio quando todas as notas foram cadastradas
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas os alunos matriculados "João da Silva" e "Maria Souza"
@@ -267,7 +267,7 @@ Feature: Notificações de pendências no lançamento de notas
       And o histórico de processamento registra o lembrete de "25/08/2026 às 09:00" com status "Ignorado" e motivo "Nenhuma nota pendente"
       And nenhuma nova tentativa de envio de e-mail é registrada
       And a última tentativa de envio permanece sendo a de "20/08/2026 às 09:00", com status "Enviado"
-      And o lembrete de "29/08/2026 às 09:00" permanece com status "Agendado"
+      And o lembrete de "29/08/2026 às 09:00" permanece com status "Não enviado"
       And o prazo acadêmico da turma "2026.2 de ESS" permanece "31/08/2026 às 23:59"
 
 

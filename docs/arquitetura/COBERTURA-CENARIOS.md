@@ -15,9 +15,11 @@ as duas notificações de Paulo, sem autenticação ou registros de outros profe
 Nos outros 11 cenários GUI, a precondição de autenticação foi retirada com
 aprovação do responsável. Cada um começa explicitamente com o professor Paulo
 Borba na tela inicial validada, preservando a turma e os filtros indicados.
-Os nomes, tags e demais passos desses cenários foram mantidos. Os nomes e passos
-dos 13 cenários service permanecem inalterados; as marcações conceituais
-acompanham os incrementos aprovados do modelo.
+Os nomes, tags e demais passos desses cenários foram mantidos. Os nomes dos
+13 cenários service permanecem inalterados. No cenário de ausência de envio,
+o Then do lembrete futuro de 29/08 foi corrigido, com aprovação, para preservar
+Não enviado, igual ao Given. Os demais passos service permanecem iguais;
+as marcações conceituais acompanham os incrementos aprovados do modelo.
 As outras três features continuam idênticas à origem.
 
 ## Critério de completude do DDD
@@ -68,8 +70,8 @@ resultados de execução. Cada cenário tem abaixo uma evidência ou lacuna do D
 
 `//ok DDD (regra central)` corresponde à classificação **Regra central representada**,
 com as condições e limites das seções abaixo. Não há marcação de aprovação
-integral dos cenários GUI ou service. As contagens são 12 GUI e 5 service com `//ok`,
-6 cenários com `//parcial` e 2 com `//pendente`, totalizando 12 GUI e 13 service.
+integral dos cenários GUI ou service. As contagens são 12 GUI e 6 service com `//ok`,
+5 cenários com `//parcial` e 2 com `//pendente`, totalizando 12 GUI e 13 service.
 
 ## Cenários GUI
 
@@ -123,7 +125,7 @@ concorrente implementados na aplicação.
 | Cenário | Cobertura conceitual | Evidência e lacuna |
 | --- | --- | --- |
 | [Envio de lembrete com notas pendentes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L230) | Parcial | Pendências, prazo, emailProfessor, registro, marcação Enviado e contrato de EmailSender estão representados. O comentário complementar sobre processar foi dispensado pelo responsável e deixa de ser uma alteração pendente. A classificação foi preservada até a conclusão da revisão do cenário. |
-| [Ausência de envio quando todas as notas foram cadastradas](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L253) | Parcial | Consulta sem pendências permite ignorar o Lembrete e registrar Notificacao Ignorado por registrar e listar existentes, com motivo Nenhuma nota pendente, descricaoFalha vazia e pendenciasRegistradas vazia. As consultas de tentativas consideram apenas Enviado/Falha, preservando a última tentativa de 20/08. Falta validar a divergência Não enviado/Agendado do lembrete futuro. |
+| [Ausência de envio quando todas as notas foram cadastradas](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L253) | Regra central representada | Consulta sem pendências permite ignorar o Lembrete e registrar Notificacao Ignorado pelos métodos existentes, sem email ou nova tentativa. As consultas de tentativas consideram apenas Enviado/Falha, preservando a última tentativa de 20/08. O Then aprovado preserva Não enviado para o lembrete futuro de 29/08, igual ao Given. |
 | [Identificação correta das notas pendentes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L278) | Regra central representada | Class.identificarPendencias percorre as matrículas e seus registros por Enrolment.listarAvaliacoes. Evaluation.dataAvaliacao permite excluir futuras; buscarNota distingue nota vazia de zero válido. Os registros já existem antes da nota, e a consulta devolve apenas a pendência de João na prova realizada, preservando os dados. |
 | [Envio independente de lembretes para múltiplas turmas](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L295) | Parcial | Busca e pendências ficam restritas à turma indicada, com o mesmo emailProfessor e contrato de EmailSender. O comentário complementar sobre processar foi dispensado pelo responsável e deixa de ser uma alteração pendente. A classificação foi preservada até a conclusão da revisão do cenário. |
 | [Bloqueio de envio de lembrete não agendado](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L316) | Regra central representada | processarAgendados consulta buscarLembretesPara na configuração da turma; lista vazia rejeita a solicitação sem email ou tentativa, preservando prazo, lembretes e histórico. |
@@ -136,8 +138,8 @@ concorrente implementados na aplicação.
 | [Cancelamento de reenvio após resolução das pendências](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L448) | Pendente | A consulta das notas atuais pode identificar uma lista vazia; faltam a decisão de cancelar, a transição para Cancelado com motivo e a retirada dos reenvios. Rejeitar marcação de Cancelado não efetua esse cancelamento. |
 | [Interrupção dos reenvios após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L470) | Parcial | processar verifica o prazo antes da tentativa e retorna Prazo acadêmico encerrado, sem email ou novo registro, preservando o estado e o histórico; faltam transição para Cancelado, preservação do motivo e interrupção dos reenvios programados. |
 
-Resultado da análise: 17 regras centrais representadas (12 GUI e 5 service),
-6 cenários parciais e 2 pendentes. Isso não equivale a 17 cenários completos passando.
+Resultado da análise: 18 regras centrais representadas (12 GUI e 6 service),
+5 cenários parciais e 2 pendentes. Isso não equivale a 18 cenários completos passando.
 
 ## Nome do serviço compartilhado
 
@@ -164,13 +166,14 @@ Nas tentativas de envio, Notificacao.motivo continua representando o propósito 
 
 O lembrete de 25/08 às 09:00 é ignorado, sem contar como Enviado. O lembrete
 enviado de 20/08, suas notificações, o lembrete futuro de 29/08, o prazo e os
-demais dados são preservados. Os nomes e passos Gherkin permanecem iguais.
+demais dados são preservados. O nome e os demais passos Gherkin são preservados;
+a única correção aprovada no cenário ajusta o Then do lembrete futuro.
 
-O cenário permanece Parcial: a transição, a decisão de não enviar e o registro
-do processamento Ignorado estão representados. Resta uma divergência no próprio cenário:
-o lembrete de 29/08 aparece como Não enviado no Given e como Agendado no Then,
-embora deva permanecer inalterado. Os termos são preservados até validação;
-este incremento não unifica os estados nem define cancelamento de reenvios.
+O cenário passa para Regra central representada: a transição, a decisão de não
+enviar e o registro do processamento Ignorado estão representados, e a correção
+aprovada preserva Não enviado para o lembrete de 29/08 no Given e no Then.
+Esse lembrete futuro não foi processado. Não há alteração no DDD ou no PNG,
+unificação geral de estados ou definição de cancelamento de reenvios.
 
 A proposta de acrescentar `registrarProcessamento`, coleção ou classe de registro
 foi substituída pelo reaproveitamento aprovado de Notificacao e dos métodos
@@ -203,10 +206,11 @@ a última tentativa continua sendo a de 20/08 com resultado Enviado. Os registro
 anteriores e o lembrete futuro são preservados. Filtrar e buscar reutilizam os
 dados históricos existentes, sem alterar registros.
 
-Os nomes, passos, tags e classificações dos cenários são preservados. A ausência
-de envio continua Parcial somente pela divergência de estado de 29/08, que exige
-validação antes de alterar o Gherkin. Cancelamento, reenvios e concorrência
-continuam nos seus respectivos cenários em revisão.
+O reaproveitamento preservou os nomes, passos, tags e classificações dos cenários.
+A correção aprovada do Then de 29/08 encerra a divergência de estado e permite
+classificar a ausência de envio como Regra central representada. Os demais
+cenários preservam suas classificações; cancelamento, reenvios e concorrência
+continuam em revisão.
 
 ## Destinatário dos lembretes
 

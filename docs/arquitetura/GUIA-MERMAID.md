@@ -479,12 +479,12 @@ nas tentativas de envio, continua descrevendo o propósito do aviso. O lembrete 
 não é contabilizado como Enviado. Os outros lembretes, as notificações anteriores,
 as notas, as matrículas e o prazo da turma são preservados.
 
-Não são acrescentados métodos em NotificacaoService ou relações. O cenário
-permanece Parcial: o histórico de processamento é representado pelo reaproveitamento
-de Notificacao descrito abaixo; ainda falta validar a divergência Não enviado/Agendado
-para o lembrete futuro de 29/08.
-Os passos Gherkin são preservados, sem unificar esses estados ou definir o
-cancelamento de reenvios neste incremento.
+Não são acrescentados métodos em NotificacaoService ou relações. O histórico
+é representado pelo reaproveitamento de Notificacao descrito abaixo. A correção
+aprovada altera apenas o Then do lembrete futuro de 29/08 para Não enviado,
+igual ao Given, pois ele não foi processado. O cenário passa de Parcial para
+Regra central representada, com os demais passos preservados. Não há alteração
+no DDD ou no PNG, unificação geral de estados ou definição de cancelamento de reenvios.
 
 ### Endereço do professor destinatário
 
