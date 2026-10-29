@@ -47,9 +47,11 @@ namespace Servidor {
     addStudent()
     removeStudent()
     synchronize()
-    configurarLembretes()
+    configurarLembretes(turma, quantidade, lembretesPropostos) String
+    consultarConfiguracaoLembretes(turma)
     consultarHistorico()
-    consultarDetalhesNotificacao()
+    filtrarHistorico(disciplina, turma)
+    consultarDetalhesNotificacao(idNotificacao)
   }
   class StudentListImport["StudentList Import"]
   class StudentList {
@@ -61,42 +63,69 @@ namespace Servidor {
     email
   }
   class GradesImportService["Grades Import Service"]
-  class Classes
+  class Classes {
+    buscar(turma) Class
+  }
   class Class {
     semester
+    prazoAcademico
+    prazoEncerrado(instanteAtual) boolean
+    obterConfiguracaoLembretes() ConfiguracaoLembretes
+    identificarPendencias(instanteAtual)
   }
-  class Enrolment
+  class Enrolment {
+    buscarNota(avaliacao)
+    listarAvaliacoes() Evaluation[]
+  }
   class Evaluation {
     goal
     grade
+    dataAvaliacao
   }
   class GradeNotification["Grade Notification"]
   class EmailSender {
     send(String[])
+    send(destinatario, assunto, conteudo)
   }
   class ConfiguracaoLembretes {
     add(Lembrete)
     remove(Lembrete)
     atualizar(quantidade, lembretesPropostos, instanteAtual, prazoAcademico)
+    buscarLembretesPara(data, horario) Lembrete[]
+    listar() Lembrete[]
   }
   class Lembrete {
     id
     data
     horário
     estado
+    motivo
     reagendar(novaData, novoHorario, instanteAtual, prazoAcademico)
+    jaFoiEnviado() boolean
+    marcarComoEnviado()
+    ignorar(motivo)
   }
-  class LembreteService["Lembrete Service"] {
+  class NotificacaoService["NotificaçãoService"] {
+    emailProfessor
     processar(Lembrete)
+    processarAgendados(turma, data, horario)
   }
   class HistoricoNotificacoes {
     registrar(Notificacao)
+    listar() Notificacao[]
+    filtrar(disciplina, turma) Notificacao[]
+    buscar(idNotificacao)
   }
   class Notificacao {
+    id
+    nomeDestinatario
+    turmaRegistrada
     dataHora
     resultado
     motivo
     descricaoFalha
+    pendenciasRegistradas
+    prazoRegistrado
   }
 }
 
@@ -132,7 +161,8 @@ Enrolment *--> "*" Evaluation : evaluations
 GradeNotification --> EmailSender
 
 %% EXTENSÕES JÁ VALIDADAS.
-Class --> ConfiguracaoLembretes
+%% A escrita invertida ajusta o layout; Class continua acessando sua configuração.
+ConfiguracaoLembretes <-- Class
 ConfiguracaoLembretes *--> "*" Lembrete : lembretes
 Services --> HistoricoNotificacoes
 
@@ -140,20 +170,135 @@ Services --> HistoricoNotificacoes
 HistoricoNotificacoes *--> "*" Notificacao
 Notificacao --> Lembrete : origem
 
-%% PROCESSAMENTO DOS LEMBRETES: serviço de aplicação e associações de acesso.
+%% SERVIÇO DE NOTIFICAÇÕES: nome compartilhado aprovado; as operações atuais tratam lembretes.
+%% O processamento de outros tipos de notificação será validado com a equipe, sem novas operações neste incremento.
 %% Processar um lembrete não implica envio obrigatório.
 %% Classes permite acessar as turmas, suas configurações e os lembretes.
-%% Esta associação não define a busca por horários nem o início automático do processamento.
-%% A escrita invertida orienta o layout; o acesso continua de LembreteService para Classes.
-Classes <-- LembreteService
-LembreteService --> Lembrete
-LembreteService --> EmailSender
-%% A escrita invertida mantém o acesso de LembreteService ao histórico.
-HistoricoNotificacoes <-- LembreteService
+%% Estas associações não definem o início automático do processamento.
+%% A escrita invertida orienta o layout; o acesso continua de NotificacaoService para Classes.
+Classes <-- NotificacaoService
+%% A escrita invertida preserva o acesso de NotificacaoService ao Lembrete.
+Lembrete <-- NotificacaoService
+NotificacaoService --> EmailSender
+%% A escrita invertida mantém o acesso de NotificacaoService ao histórico.
+HistoricoNotificacoes <-- NotificacaoService
+
+%% DESTINATÁRIO DOS LEMBRETES: emailProfessor é uma configuração de NotificacaoService.
+%% O endereço do único professor fica disponível antes do processamento automático.
+%% processar(Lembrete) usa esse endereço como destinatário ao solicitar envio a EmailSender,
+%% pela relação existente NotificacaoService --> EmailSender; turmas diferentes usam o mesmo destinatário.
+%% Não acrescentar nomeProfessor, entidade Professor, método de cadastro ou nova relação.
+
+%% CONTRATO DE EMAILSENDER: send(destinatario, assunto, conteudo) solicita o envio da mensagem recebida.
+%% destinatario é o endereço de destino; assunto e conteudo são os textos fornecidos por quem solicita o envio.
+%% O retorno informa aceitação pelo serviço de email ou falha acompanhada da descrição do erro.
+%% Aceitação não significa confirmação de entrega ou leitura pelo destinatário.
+%% Preservar send(String[]) e a relação existente de GradeNotification com EmailSender.
+%% Este incremento acrescenta apenas a operação de EmailSender, sem alterar métodos ou regras de NotificacaoService.
 
 %% IDENTIDADE DO LEMBRETE: alterar data ou horário preserva seu id.
 %% Um novo lembrete recebe outra identidade; formato e geração do id ainda não estão definidos.
 %% O id permite reconhecer o mesmo lembrete, mas não garante prevenção de duplicidade.
+
+%% PRAZO DA TURMA: prazoAcademico pertence a Class; não é o semestre nem o horário do lembrete.
+%% prazoEncerrado(instanteAtual) retorna verdadeiro somente se instanteAtual for posterior ao prazoAcademico.
+%% Antes do prazo ou exatamente nele, retorna falso; isso não aprova automaticamente uma configuração ou envio.
+%% A consulta preserva a turma, seus lembretes e o histórico; não consulta o relógio nem envia email.
+%% Services acessa a turma por Classes, consulta uma vez o relógio do servidor e fornece instanteAtual.
+%% O prazo dessa mesma Class é fornecido a atualizar e reagendar; não criar outra entidade para a data.
+%% A forma de cadastrar o prazo não é acrescentada neste incremento.
+
+%% CRIAÇÃO APÓS O PRAZO: em configurarLembretes, se a proposta incluir novo Lembrete
+%% e Class.prazoEncerrado retornar verdadeiro, rejeitar com o motivo Prazo acadêmico encerrado.
+%% Rejeitar antes de aplicar a proposta; preservar turma, prazo, configuração, lembretes enviados e histórico.
+%% Não criar o novo Lembrete, não solicitar email e não registrar uma tentativa de envio.
+%% Esta regra de criação não define novas restrições para propostas sem novos lembretes.
+
+%% BUSCA POR AGENDAMENTO: buscarLembretesPara é uma consulta da ConfiguracaoLembretes da turma.
+%% Retornar todos os Lembretes cuja data e horário correspondem aos parâmetros, ou uma lista vazia.
+%% Preservar objetos, estados e histórico; não criar lembrete, não enviar email e não consultar o relógio.
+%% Não impor unicidade de data e horário nem filtrar ou unificar estados Não enviado, Agendado e Enviado.
+%% Lembretes de outras configurações não participam da consulta.
+
+%% ENTRADA POR AGENDAMENTO: processarAgendados usa a turma indicada, acessível por Classes,
+%% e consulta sua ConfiguracaoLembretes por buscarLembretesPara(data, horario).
+%% Se a lista estiver vazia, rejeitar a solicitação por inexistência de lembrete para a turma e o agendamento.
+%% Preservar turma, prazo, configuração, lembretes e histórico; não solicitar email nem registrar tentativa.
+%% Se houver correspondências, coordenar processar(Lembrete) para cada uma, mantendo as verificações dessa operação.
+%% Um Lembrete já Enviado continua sendo tratado pelo bloqueio existente; correspondência não autoriza envio.
+%% data e horario identificam o agendamento solicitado; não são substituídos pelo instante atual do relógio.
+%% O mecanismo que inicia esta entrada, a seleção automática de vencidos, reenvios e concorrência continuam pendentes.
+
+%% BLOQUEIO DE REPROCESSAMENTO: jaFoiEnviado retorna verdadeiro quando estado é Enviado.
+%% A consulta não altera o Lembrete, não consulta o relógio e não realiza envio.
+%% NotificacaoService.processar consulta essa condição antes de qualquer tentativa de email.
+%% Se verdadeiro, encerra sem acessar EmailSender para enviar, sem registrar outra Notificacao
+%% de tentativa e sem programar novo reenvio; preserva o Lembrete e todo o histórico.
+%% Falso significa apenas que o estado não é Enviado; não autoriza automaticamente o envio.
+%% Agendamento, prazo, pendências e demais estados continuam exigindo suas próprias verificações.
+%% Não enviado e Agendado continuam sem unificação por este incremento.
+%% A regra usa o estado do Lembrete recebido; carregamento, persistência e concorrência não são definidos aqui.
+%% Falhas entre aceitação do email e gravação continuam pendentes.
+
+%% BLOQUEIO POR PRAZO NO PROCESSAMENTO: depois de verificar jaFoiEnviado,
+%% NotificacaoService.processar acessa a Class correspondente pelos dados de Classes
+%% e obtém uma vez o instanteAtual consultando o relógio do servidor.
+%% Antes de qualquer tentativa de email, consulta Class.prazoEncerrado(instanteAtual).
+%% Se verdadeiro, encerra e informa Prazo acadêmico encerrado como resultado do processamento.
+%% Não solicitar email, registrar tentativa ou alterar o Lembrete, a configuração, a turma, seu prazo e o histórico.
+%% Preservar id, data, horário, estado e todas as Notificacoes anteriores; não marcar como Enviado.
+%% O resultado informado não é uma falha de email nem um novo atributo do Lembrete.
+%% A regra vale tanto para a primeira tentativa quanto para reenvios que passam por processar.
+%% Antes do prazo ou exatamente nele, continuar com as demais verificações; não autorizar envio automaticamente.
+%% Um Enviado já encerra na primeira verificação, preservado mesmo após o prazo.
+%% Não acrescentar cancelamento, motivoCancelamento, proximoReenvioEm ou novas operações e relações.
+%% A transição para Cancelado, a preservação do motivo e a interrupção dos reenvios programados continuam pendentes.
+
+%% IDENTIFICAÇÃO DE PENDÊNCIAS: Class.identificarPendencias(instanteAtual) consulta as notas das matrículas da turma.
+%% Enrolment.buscarNota(avaliacao) representa a consulta da nota individual naquela matrícula, pelas relações com Evaluation.
+%% As notas permanecem vinculadas ao aluno por sua matrícula; Class não passa a armazenar notas.
+%% Cada matrícula já contém os registros Evaluation, mesmo antes do cadastro da nota, conforme a opção A aprovada.
+%% grade vazio representa uma nota ainda não cadastrada; zero, inclusive 0,0, representa uma nota válida.
+%% Enrolment.listarAvaliacoes retorna seus registros de avaliação, incluindo os que ainda têm grade vazio.
+%% Evaluation.dataAvaliacao informa a data em que a avaliação ocorreu ou está prevista no cenário.
+%% Class percorre apenas suas matrículas, consulta listarAvaliacoes e ignora avaliações com data futura em relação a instanteAtual.
+%% Para cada avaliação já realizada, consulta buscarNota(avaliacao); nota vazia produz a pendência do aluno naquela avaliação.
+%% Nota preenchida, inclusive zero, não produz pendência; não incluir alunos de outra turma ou avaliações futuras.
+%% No cenário de 25/08, retornar apenas João sem nota na prova realizada em 20/08; Maria com zero não é pendência
+%% e o projeto previsto para 28/08 não é pendência para nenhum dos dois alunos.
+%% Identificar é uma consulta: preservar notas, datas, matrículas, lembretes e histórico, sem solicitar email ou registrar tentativa.
+%% Em processar(Lembrete), depois dos bloqueios de Enviado e prazo, NotificacaoService chama identificarPendencias
+%% na mesma Class já localizada por Classes, usando o mesmo instanteAtual obtido pelo serviço antes de solicitar email.
+%% Usar os caminhos existentes NotificacaoService --> Classes, Classes *--> Class, Class *--> Enrolment e Enrolment *--> Evaluation.
+%% Esta coordenação é interna ao processamento do lembrete; não acrescentar uma operação em Services ou uma tela no cliente.
+%% Não acrescentar AvaliacaoDaTurma ou novas relações; Evaluation mantém goal e grade e recebe apenas dataAvaliacao.
+%% O disparo automático e as decisões de envio, cancelar e reenvio seguem os respectivos cenários ainda em revisão.
+
+%% AUSÊNCIA DE PENDÊNCIAS: no cenário de todas as notas cadastradas, a consulta atual retorna uma lista vazia.
+%% O serviço usa a relação existente NotificacaoService --> Lembrete para chamar ignorar(Nenhuma nota pendente)
+%% no lembrete ainda aguardando envio, sem solicitar email ou registrar uma Notificacao de tentativa.
+%% Lembrete.ignorar(motivo) muda estado para Ignorado e guarda o motivo recebido no atributo motivo.
+%% A operação preserva id, data e horário; não consulta notas ou relógio, não envia email e não registra histórico.
+%% motivo de Lembrete guarda a justificativa de ter sido ignorado; Notificacao.motivo mantém o propósito do aviso.
+%% No cenário, o lembrete de 25/08 às 09:00 passa de Não enviado para Ignorado com motivo Nenhuma nota pendente.
+%% Preservar o enviado de 20/08 e suas notificações, o lembrete futuro de 29/08, a configuração e o prazo da turma.
+%% Não contabilizar o lembrete ignorado como Enviado nem alterar notas ou matrículas.
+%% O registro próprio de processamento ignorado continua pendente; ignorar não substitui esse histórico.
+%% Este incremento não define cancelamento de reenvios nem unifica os estados Não enviado e Agendado.
+
+%% MARCAÇÃO DE ENVIO ACEITO: marcarComoEnviado permite Não enviado ou Agendado passar para Enviado.
+%% Preservar id, data e horário; os nomes Não enviado e Agendado continuam sem unificação.
+%% Se já estiver Enviado, preservar o objeto sem outra alteração.
+%% Rejeitar a marcação em Ignorado, Cancelado ou outra condição não admitida, sem modificar o Lembrete.
+%% A operação altera apenas o estado: não envia email, não registra Notificacao e não programa reenvio.
+%% Após aceitação do email, NotificacaoService coordena registrar uma nova Notificacao Enviado
+%% e chamar marcarComoEnviado no mesmo Lembrete.
+%% Se uma tentativa válida falhar, o serviço coordena registrar uma nova Notificacao Falha,
+%% preservando as anteriores e o estado anterior de aguardando envio do Lembrete.
+%% Falha é resultado da Notificacao; este incremento não acrescenta estado Falha ao Lembrete.
+%% Falha seguida de sucesso preserva dois registros para o mesmo Lembrete, contabilizado como um enviado.
+%% Esta coordenação não define atomicidade entre email, estado e histórico nem acrescenta contadores.
+%% Programação de reenvios, persistência e concorrência continuam pendentes.
 
 %% REAGENDAMENTO: operação de negócio do Lembrete, preservando seu id.
 %% Rejeitar alteração de lembrete Enviado, novo agendamento anterior a instanteAtual
@@ -161,14 +306,26 @@ HistoricoNotificacoes <-- LembreteService
 %% Validar antes de alterar: rejeições preservam data, horário e estado anteriores.
 %% Reagendar não modifica outros lembretes, outra turma nem notificações históricas.
 %% instanteAtual é recebido do serviço, que consulta o relógio do servidor.
-%% A origem do prazoAcademico continua pendente.
+%% prazoAcademico é obtido da Class à qual a configuração pertence.
 
 %% REMOÇÃO: remove(Lembrete) retira da configuração o lembrete indicado, pertencente a ela.
 %% Lembretes Enviados são preservados; uma remoção rejeitada mantém a configuração intacta.
 %% A remoção preserva os demais lembretes e os registros históricos.
 %% A redução de quantidade é representada pela remoção, sem novo atributo de quantidade.
-%% Alterações e remoções nos estados Falha, Ignorado e Cancelado ainda serão discutidas.
+%% Alterações e remoções nos estados Ignorado e Cancelado ainda serão discutidas.
 %% Não enviado e Agendado não são unificados por este incremento.
+
+%% CONSULTA DA CONFIGURAÇÃO: Services.consultarConfiguracaoLembretes(turma) coordena a leitura da turma selecionada.
+%% Classes.buscar(turma) localiza a Class indicada; Class.obterConfiguracaoLembretes devolve sua configuração associada.
+%% ConfiguracaoLembretes.listar retorna todos os seus lembretes, com id, data, horário e estado, incluindo os Enviados.
+%% Usar as relações existentes Services --> Classes, Classes *--> Class, Class --> ConfiguracaoLembretes
+%% e ConfiguracaoLembretes *--> Lembrete; não acrescentar novas relações.
+%% Services devolve os lembretes, o prazoAcademico da mesma Class e a quantidade calculada pelo total da lista.
+%% Uma configuração sem lembretes devolve lista vazia e quantidade zero, mantendo o prazo da turma.
+%% A consulta preserva as configurações de todas as turmas, os lembretes e o histórico; não cria ou altera registros.
+%% Consultar não aplica atualizar, add, remove ou reagendar; não consulta o relógio, envia email ou processa lembretes.
+%% A leitura permite apresentar a configuração antes de editar e consultar o estado salvo após aceitação ou rejeição.
+%% Cliente, EmailService, Interface, os demais métodos e as regras de atualização permanecem inalterados.
 
 %% ATUALIZAÇÃO COMPLETA: atualizar recebe a proposta do conjunto final antes de alterar a configuração.
 %% lembretesPropostos são dados de edição, não uma nova entidade nem lembretes já modificados.
@@ -179,25 +336,96 @@ HistoricoNotificacoes <-- LembreteService
 %% Alterações em lembretes existentes preservam seus ids.
 %% Validar todo o conjunto antes de aplicar: qualquer rejeição mantém a configuração anterior intacta.
 %% A atualização não afeta outras turmas nem o histórico, e não acrescenta quantidade como atributo.
-%% Services.configurarLembretes continua sendo a entrada conceitual da aplicação.
+%% Services.configurarLembretes(turma, quantidade, lembretesPropostos) continua sendo a entrada conceitual da aplicação.
 %% O serviço consulta o relógio do servidor uma vez por atualização e fornece instanteAtual.
 %% instanteAtual não é informado pelo professor nem armazenado como atributo da configuração.
-%% A origem do prazo e a gravação integral em armazenamento continuam pendentes.
+%% O prazo é obtido da mesma Class; a gravação integral em armazenamento continua pendente.
+
+%% CONTRATO DE SALVAMENTO: Services recebe a turma selecionada, a quantidade e a proposta do conjunto final.
+%% Localizar a Class por Classes.buscar(turma) e obter sua configuração por obterConfiguracaoLembretes().
+%% O serviço fornece o instante obtido do relógio e o prazoAcademico da mesma Class a atualizar.
+%% Usar as associações existentes com Classes, Class, ConfiguracaoLembretes e Lembrete.
+%% O retorno String contém a confirmação ou o motivo da rejeição previsto no cenário.
+%% Após aceitar a proposta completa, retornar Configuração salva com sucesso.
+%% Quantidade incompatível ou agendamento obrigatório sem data/horário: Selecione exatamente N datas e horários,
+%% onde N é a quantidade solicitada; no cenário de três lembretes, Selecione exatamente 3 datas e horários.
+%% Agendamento novo ou alterado posterior ao prazo: Data posterior ao prazo acadêmico.
+%% Alteração de lembrete Enviado: Lembretes enviados não podem ser alterados.
+%% Agendamento novo ou alterado anterior ao instante atual: Não é possível agendar lembretes em datas anteriores à data atual.
+%% A regra existente de criação após o prazo continua retornando Prazo acadêmico encerrado antes de aplicar a proposta.
+%% Qualquer rejeição preserva toda a configuração anterior, os ids e estados dos lembretes, o prazo e o histórico.
+%% O sucesso preserva as outras turmas, os lembretes Enviados e o histórico, conforme as regras de atualizar.
+%% Salvar não solicita email nem processa lembretes; a consulta existente permite apresentar o estado salvo.
+%% Não acrescentar entidades, atributos ou relações nem modificar métodos do cliente, EmailService ou Interface.
 
 %% Nesta feature, cada Notificacao registra uma tentativa de envio realizada.
 %% dataHora registra o momento da tentativa; motivo descreve o propósito do aviso.
 %% resultado é Enviado ou Falha; Enviado indica aceitação pelo serviço de email.
 %% descricaoFalha é preenchida quando houver falha.
 %% Um reenvio gera outra Notificacao para o mesmo Lembrete, preservando a anterior.
-%% REGISTRO DOS RESULTADOS: o LembreteService coordena o registro de cada tentativa realizada.
+%% IDENTIDADE E CONTEXTO DO REGISTRO: cada Notificacao tem id próprio, estável e distinto a cada tentativa.
+%% O id da Notificacao não é o id do Lembrete nem a combinação de turma, data e horário.
+%% Tentativas com a mesma data e horário continuam distintas; formato e geração técnica do id não são fixados aqui.
+%% nomeDestinatario preserva o nome usado naquela tentativa; nesta feature, é o nome do professor.
+%% turmaRegistrada preserva a identificação textual da turma naquela tentativa, como 2026.2 de ESS.
+%% Esses dados são registrados com a Notificacao e não recalculados a partir da Class ou do contexto atual na consulta.
+%% Alterações posteriores na turma ou no nome do destinatário preservam o registro anterior.
+%% Um reenvio registra outra Notificacao com outro id; não substitui a falha pelo sucesso nem altera seu contexto.
+%% O professor é conhecido no contexto do sistema; não criar entidade Professor, autenticação ou RBAC.
+%% O contexto de turma é detalhado para esta feature; não obriga outras funcionalidades a terem origem em Lembrete.
+%% PENDÊNCIAS REGISTRADAS: Notificacao guarda a lista de alunos e avaliações sem nota informada naquela tentativa.
+%% Cada item preserva os nomes do aluno e da avaliação usados no aviso; não são referências às notas atuais.
+%% Na tentativa de 25/08, preservar João da Silva - Prova 2 e Maria Souza - Projeto 1.
+%% Cadastrar as notas em 26/08 não modifica pendenciasRegistradas da tentativa anterior.
+%% Cada nova tentativa preserva sua própria lista; um reenvio não substitui a lista da tentativa anterior.
+%% HistoricoNotificacoes.registrar preserva essa lista junto dos demais dados da Notificacao.
+%% A relação com Lembrete continua representando a origem; as pendências históricas pertencem à tentativa.
+%% PRAZO REGISTRADO: Class.prazoAcademico continua sendo o prazo oficial utilizado nas regras da turma.
+%% NotificacaoService obtém o prazo da mesma Class pelo acesso existente a Classes e o copia para prazoRegistrado
+%% ao compor a Notificacao daquela tentativa, registrada por HistoricoNotificacoes.registrar.
+%% prazoRegistrado preserva o prazo acadêmico informado no aviso, como 31/08/2026 às 23:59.
+%% dataHora continua sendo o instante da tentativa, como 25/08/2026 às 09:00; os dois dados têm significados distintos.
+%% Registrar outra tentativa preserva o prazo e os demais dados das notificações anteriores.
+%% Services.consultarDetalhesNotificacao devolve o prazo registrado pela consulta existente buscar(idNotificacao).
+%% Os métodos, as relações, as demais classes e o prazo oficial em Class permanecem inalterados.
+%% LISTAGEM DO HISTÓRICO: nesta funcionalidade há um único professor, com suas turmas disponíveis.
+%% HistoricoNotificacoes.listar retorna as Notificacoes registradas, incluindo sucessos e falhas.
+%% Services.consultarHistorico coordena listar pela associação Services --> HistoricoNotificacoes.
+%% A composição HistoricoNotificacoes *--> Notificacao representa os registros devolvidos.
+%% A listagem disponibiliza nomeDestinatario, turmaRegistrada, dataHora, motivo e resultado registrados.
+%% Preservar os ids, estados e todos os dados das notificações; consultar não envia email nem executa reenvio.
+%% Não selecionar por professor nem acrescentar sua entidade, identificador, autenticação ou controle de acesso.
+%% As classes do cliente, EmailService, Interface e suas relações permanecem inalteradas.
+%% Os métodos de apresentação e navegação do cliente não são necessários a esta validação de domínio.
+%% A filtragem segue a regra abaixo; pendências e prazo estão preservados no registro da tentativa.
+%% FILTRAGEM DO HISTÓRICO: Services.filtrarHistorico coordena HistoricoNotificacoes.filtrar(disciplina, turma).
+%% Usar a associação Services --> HistoricoNotificacoes e sua composição com Notificacao, já desenhadas.
+%% Retornar apenas os registros que correspondem simultaneamente à disciplina e à turma selecionadas.
+%% turmaRegistrada já contém a identificação da turma e sua disciplina, como 2026.2 de ESS.
+%% A seleção usa esses dados históricos existentes; não acrescentar disciplinaRegistrada ou outro atributo.
+%% Para ESS e 2026.2 de ESS, incluir a notificação dessa turma e excluir 2026.1 de ESS e outras disciplinas.
+%% Preservar as notificações excluídas do resultado no histórico, além dos ids, datas, motivos e resultados.
+%% A consulta não altera registros, envia email, executa reenvio ou consulta a identificação atual de Class.
+%% A regra usa o histórico do único professor; cliente, EmailService, Interface e suas relações ficam preservados.
+%% CONSULTA DE DETALHES: buscar(idNotificacao) consulta o HistoricoNotificacoes considerado no contexto atual.
+%% Retornar a Notificacao com esse id ou indicar ausência; não selecionar apenas por turma, data ou horário.
+%% Services.consultarDetalhesNotificacao(idNotificacao) coordena a busca pelas associações existentes.
+%% Retornar os dados registrados: nomeDestinatario, turmaRegistrada, dataHora, motivo, resultado, descricaoFalha, pendenciasRegistradas e prazoRegistrado.
+%% Devolver a lista da tentativa selecionada, sem recalculá-la a partir das notas atuais ou do Lembrete.
+%% Selecionar a tentativa no cenário corresponde a consultar seu id; o transporte desse id não é definido aqui.
+%% Uma ausência não cria Notificacao ou registro substituto; a consulta preserva todos os dados e estados.
+%% Consultar não envia email, executa reenvio ou modifica os registros anteriores.
+%% Listagem e filtragem seguem as regras do único professor acima; os detalhes incluem prazo e pendências da tentativa selecionada.
+%% REGISTRO DOS RESULTADOS: o NotificacaoService coordena o registro de cada tentativa realizada.
 %% HistoricoNotificacoes.registrar acrescenta a Notificacao sem substituir ou alterar registros anteriores.
 %% Uma falha mantém resultado Falha e descricaoFalha; um reenvio aceito gera outro registro Enviado.
 %% Os dois registros podem referenciar o mesmo Lembrete, sem representar dois lembretes enviados.
 %% Esta associação indica acesso; não define sequência de chamadas nem persistência.
 %% Processar sem tentativa de email não gera uma Notificacao de tentativa.
-%% Seleção do histórico por professor, estados, programação de reenvios e duplicidade continuam pendentes.
+%% Demais transições de estado, programação de reenvios
+%% e garantias contra duplicidade por concorrência ou falha de gravação continuam pendentes.
 %% TentativaEnvio não será acrescentada neste incremento.
-%% O registro de processamento ignorado e os detalhes históricos continuam pendentes.
+%% O registro de processamento ignorado continua pendente; prazo e pendências históricos estão preservados na Notificacao.
 %% Os cenários usam motivo tanto para o propósito do aviso quanto para a causa da falha.
 %% Essa diferença de linguagem precisa de validação; os cenários não são reinterpretados aqui.
 %% A relação de GradeNotification com EmailSender já existe na base.
