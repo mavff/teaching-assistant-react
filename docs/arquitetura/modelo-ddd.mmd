@@ -127,6 +127,7 @@ namespace Servidor {
     pendenciasRegistradas
     prazoRegistrado
   }
+  note for Notificacao "resultado:<br/>Enviado/Falha: tentativa de envio.<br/>Ignorado: processamento sem envio."
 }
 
 %% CLIENTE E INTERFACE: preserve as duas formas de acesso ao servidor.
@@ -279,11 +280,15 @@ HistoricoNotificacoes <-- NotificacaoService
 %% no lembrete ainda aguardando envio, sem solicitar email ou registrar uma Notificacao de tentativa.
 %% Lembrete.ignorar(motivo) muda estado para Ignorado e guarda o motivo recebido no atributo motivo.
 %% A operação preserva id, data e horário; não consulta notas ou relógio, não envia email e não registra histórico.
-%% motivo de Lembrete guarda a justificativa de ter sido ignorado; Notificacao.motivo mantém o propósito do aviso.
+%% No caso Ignorado, motivo de Lembrete e de Notificacao guardam Nenhuma nota pendente.
+%% Nas tentativas Enviado/Falha, Notificacao.motivo mantém o propósito do aviso.
 %% No cenário, o lembrete de 25/08 às 09:00 passa de Não enviado para Ignorado com motivo Nenhuma nota pendente.
 %% Preservar o enviado de 20/08 e suas notificações, o lembrete futuro de 29/08, a configuração e o prazo da turma.
 %% Não contabilizar o lembrete ignorado como Enviado nem alterar notas ou matrículas.
-%% O registro próprio de processamento ignorado continua pendente; ignorar não substitui esse histórico.
+%% NotificacaoService registra esse processamento por HistoricoNotificacoes.registrar(Notificacao).
+%% Reaproveitar resultado Ignorado, motivo Nenhuma nota pendente, descricaoFalha vazia e pendenciasRegistradas vazia.
+%% A Notificacao recebe id próprio e dataHora do processamento, preservando o contexto e o prazo da mesma turma.
+%% ignorar altera o Lembrete; registrar preserva o resultado histórico sem criar uma tentativa de email.
 %% Este incremento não define cancelamento de reenvios nem unifica os estados Não enviado e Agendado.
 
 %% MARCAÇÃO DE ENVIO ACEITO: marcarComoEnviado permite Não enviado ou Agendado passar para Enviado.
@@ -358,38 +363,42 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Salvar não solicita email nem processa lembretes; a consulta existente permite apresentar o estado salvo.
 %% Não acrescentar entidades, atributos ou relações nem modificar métodos do cliente, EmailService ou Interface.
 
-%% Nesta feature, cada Notificacao registra uma tentativa de envio realizada.
-%% dataHora registra o momento da tentativa; motivo descreve o propósito do aviso.
-%% resultado é Enviado ou Falha; Enviado indica aceitação pelo serviço de email.
-%% descricaoFalha é preenchida quando houver falha.
+%% Nesta feature, Notificacao registra o resultado de um processamento, com ou sem tentativa de envio.
+%% resultado é Enviado, Falha ou Ignorado; somente Enviado e Falha representam tentativas de email.
+%% Enviado indica aceitação pelo serviço de email; Ignorado não indica falha nem envio realizado.
+%% dataHora registra o momento da tentativa ou, no caso Ignorado, o momento do processamento sem envio.
+%% Nas tentativas, motivo descreve o propósito do aviso; em Ignorado, guarda Nenhuma nota pendente.
+%% descricaoFalha é preenchida somente em Falha; em Ignorado fica vazia, assim como pendenciasRegistradas.
 %% Um reenvio gera outra Notificacao para o mesmo Lembrete, preservando a anterior.
-%% IDENTIDADE E CONTEXTO DO REGISTRO: cada Notificacao tem id próprio, estável e distinto a cada tentativa.
+%% IDENTIDADE E CONTEXTO DO REGISTRO: cada Notificacao tem id próprio, estável e distinto a cada registro.
 %% O id da Notificacao não é o id do Lembrete nem a combinação de turma, data e horário.
-%% Tentativas com a mesma data e horário continuam distintas; formato e geração técnica do id não são fixados aqui.
-%% nomeDestinatario preserva o nome usado naquela tentativa; nesta feature, é o nome do professor.
-%% turmaRegistrada preserva a identificação textual da turma naquela tentativa, como 2026.2 de ESS.
+%% Registros com a mesma data e horário continuam distintos; formato e geração técnica do id não são fixados aqui.
+%% nomeDestinatario preserva o professor destinatário do lembrete, inclusive quando o processamento não solicita envio.
+%% turmaRegistrada preserva a identificação textual da turma naquele processamento, como 2026.2 de ESS.
 %% Esses dados são registrados com a Notificacao e não recalculados a partir da Class ou do contexto atual na consulta.
 %% Alterações posteriores na turma ou no nome do destinatário preservam o registro anterior.
 %% Um reenvio registra outra Notificacao com outro id; não substitui a falha pelo sucesso nem altera seu contexto.
 %% O professor é conhecido no contexto do sistema; não criar entidade Professor, autenticação ou RBAC.
 %% O contexto de turma é detalhado para esta feature; não obriga outras funcionalidades a terem origem em Lembrete.
-%% PENDÊNCIAS REGISTRADAS: Notificacao guarda a lista de alunos e avaliações sem nota informada naquela tentativa.
+%% PENDÊNCIAS REGISTRADAS: Notificacao guarda a lista de alunos e avaliações sem nota identificada naquele processamento.
 %% Cada item preserva os nomes do aluno e da avaliação usados no aviso; não são referências às notas atuais.
 %% Na tentativa de 25/08, preservar João da Silva - Prova 2 e Maria Souza - Projeto 1.
 %% Cadastrar as notas em 26/08 não modifica pendenciasRegistradas da tentativa anterior.
-%% Cada nova tentativa preserva sua própria lista; um reenvio não substitui a lista da tentativa anterior.
+%% Cada novo registro preserva sua própria lista; em Ignorado a lista é vazia, sem modificar os registros anteriores.
 %% HistoricoNotificacoes.registrar preserva essa lista junto dos demais dados da Notificacao.
-%% A relação com Lembrete continua representando a origem; as pendências históricas pertencem à tentativa.
+%% A relação com Lembrete continua representando a origem; as pendências históricas pertencem ao registro.
 %% PRAZO REGISTRADO: Class.prazoAcademico continua sendo o prazo oficial utilizado nas regras da turma.
 %% NotificacaoService obtém o prazo da mesma Class pelo acesso existente a Classes e o copia para prazoRegistrado
-%% ao compor a Notificacao daquela tentativa, registrada por HistoricoNotificacoes.registrar.
-%% prazoRegistrado preserva o prazo acadêmico informado no aviso, como 31/08/2026 às 23:59.
-%% dataHora continua sendo o instante da tentativa, como 25/08/2026 às 09:00; os dois dados têm significados distintos.
-%% Registrar outra tentativa preserva o prazo e os demais dados das notificações anteriores.
+%% ao compor a Notificacao daquele processamento, registrada por HistoricoNotificacoes.registrar.
+%% prazoRegistrado preserva o prazo acadêmico da turma naquele momento, informado no aviso quando houver envio.
+%% dataHora registra o processamento ou tentativa, como 25/08/2026 às 09:00; não é o prazo acadêmico.
+%% Registrar outro processamento preserva o prazo e os demais dados das notificações anteriores.
 %% Services.consultarDetalhesNotificacao devolve o prazo registrado pela consulta existente buscar(idNotificacao).
 %% Os métodos, as relações, as demais classes e o prazo oficial em Class permanecem inalterados.
 %% LISTAGEM DO HISTÓRICO: nesta funcionalidade há um único professor, com suas turmas disponíveis.
-%% HistoricoNotificacoes.listar retorna as Notificacoes registradas, incluindo sucessos e falhas.
+%% HistoricoNotificacoes.listar retorna as Notificacoes registradas, com resultados Enviado, Falha e Ignorado.
+%% Consultas de tentativas de envio consideram somente resultados Enviado e Falha, sem incluir Ignorado na contagem ou na última tentativa.
+%% No cenário de ausência de envio, o registro Ignorado de 25/08 fica no histórico, mas a última tentativa continua Enviado de 20/08.
 %% Services.consultarHistorico coordena listar pela associação Services --> HistoricoNotificacoes.
 %% A composição HistoricoNotificacoes *--> Notificacao representa os registros devolvidos.
 %% A listagem disponibiliza nomeDestinatario, turmaRegistrada, dataHora, motivo e resultado registrados.
@@ -397,7 +406,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Não selecionar por professor nem acrescentar sua entidade, identificador, autenticação ou controle de acesso.
 %% As classes do cliente, EmailService, Interface e suas relações permanecem inalteradas.
 %% Os métodos de apresentação e navegação do cliente não são necessários a esta validação de domínio.
-%% A filtragem segue a regra abaixo; pendências e prazo estão preservados no registro da tentativa.
+%% A filtragem segue a regra abaixo; pendências e prazo estão preservados em cada registro.
 %% FILTRAGEM DO HISTÓRICO: Services.filtrarHistorico coordena HistoricoNotificacoes.filtrar(disciplina, turma).
 %% Usar a associação Services --> HistoricoNotificacoes e sua composição com Notificacao, já desenhadas.
 %% Retornar apenas os registros que correspondem simultaneamente à disciplina e à turma selecionadas.
@@ -411,21 +420,22 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Retornar a Notificacao com esse id ou indicar ausência; não selecionar apenas por turma, data ou horário.
 %% Services.consultarDetalhesNotificacao(idNotificacao) coordena a busca pelas associações existentes.
 %% Retornar os dados registrados: nomeDestinatario, turmaRegistrada, dataHora, motivo, resultado, descricaoFalha, pendenciasRegistradas e prazoRegistrado.
-%% Devolver a lista da tentativa selecionada, sem recalculá-la a partir das notas atuais ou do Lembrete.
-%% Selecionar a tentativa no cenário corresponde a consultar seu id; o transporte desse id não é definido aqui.
+%% Devolver os dados do registro selecionado, sem recalculá-los a partir das notas atuais ou do Lembrete.
+%% Selecionar uma tentativa ou processamento corresponde a consultar seu id; o transporte desse id não é definido aqui.
 %% Uma ausência não cria Notificacao ou registro substituto; a consulta preserva todos os dados e estados.
 %% Consultar não envia email, executa reenvio ou modifica os registros anteriores.
-%% Listagem e filtragem seguem as regras do único professor acima; os detalhes incluem prazo e pendências da tentativa selecionada.
-%% REGISTRO DOS RESULTADOS: o NotificacaoService coordena o registro de cada tentativa realizada.
+%% Listagem e filtragem seguem as regras do único professor acima; os detalhes incluem prazo e pendências do registro selecionado.
+%% REGISTRO DOS RESULTADOS: NotificacaoService coordena registrar os resultados de tentativa e o processamento Ignorado aprovado.
 %% HistoricoNotificacoes.registrar acrescenta a Notificacao sem substituir ou alterar registros anteriores.
 %% Uma falha mantém resultado Falha e descricaoFalha; um reenvio aceito gera outro registro Enviado.
 %% Os dois registros podem referenciar o mesmo Lembrete, sem representar dois lembretes enviados.
 %% Esta associação indica acesso; não define sequência de chamadas nem persistência.
-%% Processar sem tentativa de email não gera uma Notificacao de tentativa.
+%% O processamento Ignorado gera Notificacao com resultado Ignorado, sem solicitar email nem criar registro de tentativa Enviado/Falha.
+%% Reutilizar registrar e listar; não acrescentar registrarProcessamento, coleção processamentos ou classe de registro.
 %% Demais transições de estado, programação de reenvios
 %% e garantias contra duplicidade por concorrência ou falha de gravação continuam pendentes.
 %% TentativaEnvio não será acrescentada neste incremento.
-%% O registro de processamento ignorado continua pendente; prazo e pendências históricos estão preservados na Notificacao.
+%% O registro Ignorado está representado com os campos existentes; prazo e pendências históricos estão preservados na Notificacao.
 %% Os cenários usam motivo tanto para o propósito do aviso quanto para a causa da falha.
 %% Essa diferença de linguagem precisa de validação; os cenários não são reinterpretados aqui.
 %% A relação de GradeNotification com EmailSender já existe na base.

@@ -249,7 +249,7 @@ Feature: Notificações de pendências no lançamento de notas
 
 
    @service # //parcial DDD
-   # DDD: Consulta sem pendências permite não enviar e chamar Lembrete.ignorar(motivo), preservando id e agendamento e guardando Ignorado com Nenhuma nota pendente; faltam o histórico próprio de processamento e validar a divergência Não enviado/Agendado do lembrete futuro.
+   # DDD: Sem pendências, ignorar o Lembrete e registrar Notificacao Ignorado por registrar/listar existentes, com motivo Nenhuma nota pendente, descricaoFalha vazia e pendenciasRegistradas vazia; tentativas incluem só Enviado/Falha e preservam a última de 20/08; falta validar Não enviado/Agendado do lembrete futuro.
    Scenario: Ausência de envio quando todas as notas foram cadastradas
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas os alunos matriculados "João da Silva" e "Maria Souza"

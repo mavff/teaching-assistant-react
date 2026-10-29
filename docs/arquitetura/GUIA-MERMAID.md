@@ -473,14 +473,16 @@ sem solicitar email nem registrar uma Notificacao de tentativa.
 | id, data e horário | Identidade e agendamento existentes | Preservados |
 
 `ignorar` altera apenas estado e motivo: não consulta notas ou relógio, envia
-email ou registra histórico. Notificacao.motivo mantém o propósito do aviso;
-Lembrete.motivo guarda a justificativa de ter sido ignorado. O lembrete ignorado
+email ou registra histórico. Lembrete.motivo guarda a justificativa de ter sido
+ignorado. No registro Ignorado, Notificacao.motivo guarda a mesma justificativa;
+nas tentativas de envio, continua descrevendo o propósito do aviso. O lembrete ignorado
 não é contabilizado como Enviado. Os outros lembretes, as notificações anteriores,
 as notas, as matrículas e o prazo da turma são preservados.
 
-Não são acrescentados métodos em NotificacaoService ou relações. O cenário passa
-de Pendente para Parcial; ainda faltam o histórico próprio de processamento e
-validar a divergência Não enviado/Agendado para o lembrete futuro de 29/08.
+Não são acrescentados métodos em NotificacaoService ou relações. O cenário
+permanece Parcial: o histórico de processamento é representado pelo reaproveitamento
+de Notificacao descrito abaixo; ainda falta validar a divergência Não enviado/Agendado
+para o lembrete futuro de 29/08.
 Os passos Gherkin são preservados, sem unificar esses estados ou definir o
 cancelamento de reenvios neste incremento.
 
@@ -513,9 +515,12 @@ de comentário complementar sobre `processar(Lembrete)` foi dispensada pelo
 responsável e deixa de ser uma alteração pendente. As classificações dos cenários
 de envio permanecem Parciais até a conclusão da revisão conceitual.
 
-### Registro dos resultados de envio
+### Registro dos resultados de processamento
 
-Nesta feature, cada `Notificacao` representa uma tentativa de envio realizada.
+Nesta feature, `Notificacao` registra o resultado de um processamento. Foram
+aprovados Enviado e Falha para tentativas de email e Ignorado para o processamento
+sem envio quando não há notas pendentes. Não são acrescentados campos, métodos,
+classes ou coleções. A anotação de Notificacao no PNG explicita essa distinção.
 `NotificaçãoService` tem acesso a `HistoricoNotificacoes` para coordenar seu registro
 pela operação `registrar(Notificacao)`. A associação representa acesso ou referência;
 ela não define uma sequência de chamadas.
@@ -525,13 +530,35 @@ Em uma falha, o registro preserva o resultado `Falha` e a descrição do erro. S
 reenvio for aceito pelo serviço de email, outra notificação registra `Enviado`.
 Os dois registros referenciam o mesmo lembrete de origem.
 
-| Acontecimento | Resultado esperado no histórico de tentativas |
+| Acontecimento | Resultado esperado no histórico |
 | --- | --- |
 | Uma tentativa é aceita pelo serviço de email | Acrescentar uma notificação com resultado Enviado. |
 | Uma tentativa falha | Acrescentar uma notificação com resultado Falha e descrição do erro. |
 | Um reenvio tem sucesso após uma falha | Preservar a falha e acrescentar o sucesso, ambos para o mesmo lembrete. |
 | Novos resultados são registrados | Preservar todos os registros anteriores. |
-| Um processamento não realiza tentativa de email | Não acrescentar uma notificação de tentativa; seu registro próprio continua pendente. |
+| Todas as notas foram cadastradas e o lembrete é ignorado | Acrescentar uma Notificacao Ignorado, sem criar uma tentativa de email. |
+
+O registro Ignorado reutiliza os campos existentes:
+
+| Campo | Valor no cenário de 25/08 às 09:00 |
+| --- | --- |
+| resultado | Ignorado |
+| motivo | Nenhuma nota pendente |
+| descricaoFalha | Vazio, pois não houve falha de envio |
+| pendenciasRegistradas | Lista vazia |
+
+O id identifica esse novo registro, dataHora guarda o momento do processamento e
+os dados de contexto e prazo são preservados a partir da mesma turma e do professor
+destinatário do lembrete. NotificacaoService utiliza `registrar(Notificacao)` pela
+seta existente para preservar esse resultado; a operação de ignorar no Lembrete
+continua separada do registro histórico.
+
+`listar()` devolve os registros Enviado, Falha e Ignorado. As consultas que tratam
+tentativas de envio selecionam somente Enviado e Falha pelo resultado. Assim, o
+registro Ignorado de 25/08 não altera a quantidade de tentativas, e a última
+tentativa permanece sendo a de 20/08 com resultado Enviado. Os registros anteriores
+permanecem intactos. A proposta de `registrarProcessamento`, de coleção separada
+ou de classe adicional foi substituída por esse reaproveitamento aprovado.
 
 Assim, a parte de registro do cenário de reenvio pode ser explicada com duas
 notificações e um único lembrete enviado. `Enviado` significa aceitação pelo serviço
@@ -541,8 +568,7 @@ O incremento detalha o registro no modelo; não implementa envio ou persistênci
 O nome do destinatário e a identificação textual da turma são preservados como
 detalhado a seguir. A listagem considera um único professor, como descrito abaixo.
 A preservação das pendências e do prazo informado no aviso é detalhada adiante.
-Continuam pendentes o registro dos processamentos
-ignorados, as demais transições de estado,
+Continuam pendentes as demais transições de estado,
 a programação dos reenvios e as garantias contra duplicidade por concorrência ou
 falha entre envio e gravação.
 O registro isolado não comprova o cenário completo de envio; a consulta da falha
@@ -568,7 +594,7 @@ turma atual para montar o histórico. Mudar o nome do destinatário ou a identif
 atual da turma preserva os valores da notificação antiga. As pendências históricas
 e o prazo informado no aviso também são preservados, como descrito adiante.
 
-O `id` da notificação identifica uma tentativa, enquanto o `id` do lembrete
+O `id` da notificação identifica um registro de processamento, enquanto o `id` do lembrete
 identifica o aviso agendado. Uma falha e seu reenvio aceito têm identificadores
 de notificação distintos, mesmo quando correspondem ao mesmo lembrete ou aparecem
 com igual data e horário. O identificador próprio é uma escolha de projeto para
@@ -615,7 +641,8 @@ professor utilizando a funcionalidade, com suas turmas disponíveis. Seu ponto
 inicial é a tela Turmas, sem autenticação ou registros de outros professores.
 
 `HistoricoNotificacoes.listar()` retorna as notificações registradas, incluindo
-sucessos e falhas. `Services.consultarHistorico()`, já presente no diagrama,
+Enviado, Falha e Ignorado. Consultas de tentativas consideram apenas Enviado e
+Falha; o registro Ignorado não é contado como tentativa. `Services.consultarHistorico()`, já presente no diagrama,
 coordena essa operação pela associação com `HistoricoNotificacoes`. A composição
 com `Notificacao` representa os registros que fornecem nome do destinatário,
 turma, data/hora, motivo e resultado para apresentação.
@@ -667,8 +694,9 @@ em 26/08/2026 às 10:00, a consulta ainda devolve essas pendências de 25/08.
 
 O método existente `Services.consultarDetalhesNotificacao(idNotificacao)` usa
 `HistoricoNotificacoes.buscar(idNotificacao)` e devolve também essa lista.
-`registrar(Notificacao)` preserva a lista junto dos demais dados da tentativa.
-Uma nova tentativa pode informar outra lista, preservando o registro anterior.
+`registrar(Notificacao)` preserva a lista junto dos demais dados do processamento.
+Um novo registro pode informar outra lista, preservando o anterior; no resultado
+Ignorado aprovado, pendenciasRegistradas é uma lista vazia.
 
 O acréscimo fica somente em `Notificacao`; os métodos e relações já existentes
 atendem à consulta. O prazo registrado foi acrescentado no incremento separado
@@ -678,7 +706,8 @@ descrito a seguir.
 
 `Class.prazoAcademico` permanece como prazo oficial da turma, utilizado para
 validar agendamentos e o processamento dos lembretes. `Notificacao.prazoRegistrado`
-preserva o prazo acadêmico informado naquela tentativa.
+preserva o prazo acadêmico da turma naquele processamento, informado no aviso
+quando há envio.
 
 `NotificacaoService` obtém o prazo da mesma turma pelo acesso existente a `Classes`
 e o copia ao compor a notificação que será registrada por
