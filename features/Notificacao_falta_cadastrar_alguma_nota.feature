@@ -350,7 +350,7 @@ Feature: Notificações de pendências no lançamento de notas
    
    
    @service # //parcial DDD
-   # DDD: Falha, sucesso posterior e um único lembrete Enviado estão descritos; faltam disparo imediato e controle dos reenvios programados.
+   # DDD: proximoReenvioEm e programarReenvio representam a programação; processar aciona um único reenvio imediato após a primeira Falha e marcarComoEnviado limpa a programação após o sucesso; falta validar motivo versus descricaoFalha nos passos de falha.
    Scenario: Reenvio automático após falha temporária
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"

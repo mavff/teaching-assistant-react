@@ -100,10 +100,12 @@ namespace Servidor {
     horário
     estado
     motivo
+    proximoReenvioEm
     reagendar(novaData, novoHorario, instanteAtual, prazoAcademico)
     jaFoiEnviado() boolean
     marcarComoEnviado()
     ignorar(motivo)
+    programarReenvio(dataHora)
   }
   class NotificacaoService["NotificaçãoService"] {
     emailProfessor
@@ -252,7 +254,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% A regra vale tanto para a primeira tentativa quanto para reenvios que passam por processar.
 %% Antes do prazo ou exatamente nele, continuar com as demais verificações; não autorizar envio automaticamente.
 %% Um Enviado já encerra na primeira verificação, preservado mesmo após o prazo.
-%% Não acrescentar cancelamento, motivoCancelamento, proximoReenvioEm ou novas operações e relações.
+%% O controle de proximoReenvioEm é tratado no incremento de reenvio imediato abaixo, sem mudar este bloqueio por prazo.
 %% A transição para Cancelado, a preservação do motivo e a interrupção dos reenvios programados continuam pendentes.
 
 %% IDENTIFICAÇÃO DE PENDÊNCIAS: Class.identificarPendencias(instanteAtual) consulta as notas das matrículas da turma.
@@ -295,7 +297,8 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Preservar id, data e horário; os nomes Não enviado e Agendado continuam sem unificação.
 %% Se já estiver Enviado, preservar o objeto sem outra alteração.
 %% Rejeitar a marcação em Ignorado, Cancelado ou outra condição não admitida, sem modificar o Lembrete.
-%% A operação altera apenas o estado: não envia email, não registra Notificacao e não programa reenvio.
+%% Ao passar para Enviado, a operação também esvazia proximoReenvioEm, retirando o reenvio pendente.
+%% Preservar motivo, id, data e horário; não enviar email, registrar Notificacao ou programar outro reenvio.
 %% Após aceitação do email, NotificacaoService coordena registrar uma nova Notificacao Enviado
 %% e chamar marcarComoEnviado no mesmo Lembrete.
 %% Se uma tentativa válida falhar, o serviço coordena registrar uma nova Notificacao Falha,
@@ -303,7 +306,23 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Falha é resultado da Notificacao; este incremento não acrescenta estado Falha ao Lembrete.
 %% Falha seguida de sucesso preserva dois registros para o mesmo Lembrete, contabilizado como um enviado.
 %% Esta coordenação não define atomicidade entre email, estado e histórico nem acrescenta contadores.
-%% Programação de reenvios, persistência e concorrência continuam pendentes.
+%% O primeiro reenvio imediato é tratado abaixo; progressão de intervalos, persistência e concorrência continuam pendentes.
+
+%% PROGRAMAÇÃO DO REENVIO: Lembrete.proximoReenvioEm guarda a data e hora da próxima tentativa; vazio significa nenhum reenvio programado.
+%% data e horário continuam identificando o agendamento original; Notificacao.dataHora guarda o momento de um resultado já registrado.
+%% programarReenvio(dataHora) recebe o instante do serviço e altera somente proximoReenvioEm no lembrete que aguarda envio.
+%% Preservar id, data, horário, estado, motivo, outros lembretes e histórico; não consultar relógio ou notas, enviar email ou registrar Notificacao.
+%% REENVIO IMEDIATO: após registrar a primeira tentativa Falha de um Lembrete, NotificacaoService programa o reenvio para imediato
+%% por programarReenvio(instanteAtual) e aciona processar(Lembrete) novamente, sem solicitação do professor.
+%% Reconhecer a primeira falha pelos registros do mesmo Lembrete no histórico existente: há apenas uma tentativa, com resultado Falha.
+%% Considerar somente Enviado/Falha; excluir Ignorado e registros de outros lembretes. Não acrescentar contador de tentativas.
+%% A nova execução passa pelos bloqueios de Enviado e prazo e consulta novamente as pendências atuais, como já definido em processar.
+%% No cenário, a primeira tentativa de 25/08 às 09:00 falha; o mesmo lembrete aguarda e recebe um único reenvio imediato.
+%% Quando o email desse reenvio é aceito, registrar outra Notificacao Enviado e chamar marcarComoEnviado no mesmo Lembrete.
+%% Preservar a primeira Falha; ficam duas tentativas e um único lembrete Enviado, com proximoReenvioEm vazio.
+%% Se o reenvio imediato também falhar, não disparar outro imediato em cadeia; os intervalos e as próximas tentativas seguem o cenário progressivo em revisão.
+%% A seleção automática de reenvios futuros, cancelamentos, concorrência e falhas entre email e gravação não são resolvidos neste incremento.
+%% Reutilizar as relações NotificacaoService --> Lembrete e NotificacaoService --> HistoricoNotificacoes, sem classe, seta ou método novo no serviço.
 
 %% REAGENDAMENTO: operação de negócio do Lembrete, preservando seu id.
 %% Rejeitar alteração de lembrete Enviado, novo agendamento anterior a instanteAtual
