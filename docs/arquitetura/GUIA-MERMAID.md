@@ -269,7 +269,8 @@ verificação, mesmo quando o prazo já encerrou.
 
 A explicação é um resultado do serviço, não uma falha de envio de email. Ela não
 é armazenada em um novo atributo do lembrete nem cria uma notificação de tentativa.
-Não são acrescentados `motivoCancelamento`, `proximoReenvioEm`, operações ou relações.
+O controle de `proximoReenvioEm` foi aprovado no incremento de reenvio imediato
+descrito adiante; este bloqueio por prazo não cancela nem retira sua programação.
 
 | Contexto | Resultado esperado no modelo |
 | --- | --- |
@@ -757,8 +758,8 @@ A regra considera o estado do lembrete recebido pelo serviço. Carregamento,
 persistência e concorrência continuam pendentes: duas execuções podem observar
 um estado ainda não enviado, e a aceitação do email pode ocorrer antes de uma
 falha de gravação. A consulta, isoladamente, não garante ausência de duplicidade
-nesses casos. O registro próprio de processamentos sem tentativa de email
-também continua pendente.
+nesses casos. O processamento Ignorado sem tentativa de email é registrado pelo
+reaproveitamento de Notificacao descrito anteriormente.
 
 ### Marcação de envio aceito e preservação das falhas
 
@@ -769,7 +770,8 @@ estiver `Enviado`, a operação preserva o objeto sem outra alteração. Em
 `Ignorado`, `Cancelado` ou outra condição não admitida, a marcação é rejeitada
 e os dados anteriores são preservados.
 
-A operação modifica somente o estado do lembrete. `NotificaçãoService` continua
+Ao passar para Enviado, a operação também esvazia `proximoReenvioEm`, preservando
+motivo, identidade e agendamento original. `NotificaçãoService` continua
 coordenando email e histórico: após o serviço de email aceitar uma tentativa
 válida, coordena o registro de uma nova `Notificacao` com resultado `Enviado`
 e chama `marcarComoEnviado()` no mesmo lembrete. `Enviado` continua significando
@@ -785,9 +787,9 @@ Exemplos para percorrer conceitualmente:
 
 | Situação | Resultado esperado no modelo |
 | --- | --- |
-| Primeira tentativa aceita para um lembrete Não enviado ou Agendado | Registrar uma notificação Enviado e marcar o mesmo lembrete como Enviado, preservando id e agendamento; `jaFoiEnviado()` passa a retornar verdadeiro. |
+| Primeira tentativa aceita para um lembrete Não enviado ou Agendado | Registrar uma notificação Enviado e marcar o mesmo lembrete como Enviado, preservando id e agendamento e esvaziando proximoReenvioEm; `jaFoiEnviado()` passa a retornar verdadeiro. |
 | Uma tentativa válida falha | Registrar uma notificação Falha; preservar o estado anterior de aguardando envio; a consulta continua retornando falso. |
-| Uma falha é seguida por uma tentativa aceita | Preservar a falha e acrescentar o sucesso para o mesmo lembrete; ele passa a Enviado e é contabilizado como um único lembrete enviado. |
+| Uma falha é seguida por uma tentativa aceita | Preservar a falha e acrescentar o sucesso para o mesmo lembrete; ele passa a Enviado, fica sem reenvio programado e é contabilizado como um único lembrete enviado. |
 | Lembrete já Enviado recebe chamadas repetidas | `processar` encerra sem novo email ou registro; uma chamada direta de `marcarComoEnviado()` preserva o objeto sem outra alteração. |
 | Marcação solicitada para Ignorado, Cancelado ou outra condição não admitida | Rejeitar sem alterar estado, identificador ou agendamento. |
 
@@ -798,10 +800,43 @@ A coordenação descrita não define uma transação atômica entre email, estad
 histórico. O endereço do destinatário está representado em
 `NotificacaoService.emailProfessor`, e o contrato de EmailSender está descrito acima.
 O comentário complementar sobre processar foi dispensado pelo responsável.
-Permanecem pendentes o agendamento dos reenvios, a persistência e a
-concorrência. Registrar uma falha não garante que outra tentativa será programada.
-O detalhamento da marcação de envio não acrescenta contadores, atributos,
-entidades ou relações; os dados da consulta são descritos em seu próprio recorte.
+O primeiro reenvio imediato foi aprovado conforme a seção abaixo. Permanecem
+pendentes os intervalos e a seleção dos reenvios futuros, os cancelamentos,
+a persistência e a concorrência. Não são acrescentados contadores ou entidades.
+
+### Programação e execução do primeiro reenvio imediato
+
+Foram aprovados `Lembrete.proximoReenvioEm` e
+`Lembrete.programarReenvio(dataHora)`. O campo vazio significa que não há reenvio
+programado. A operação recebe o instante do serviço e altera somente esse campo
+no lembrete que aguarda envio, preservando id, data, horário, estado e motivo.
+Ela não consulta notas ou relógio, envia email nem registra histórico.
+
+Após registrar a primeira tentativa Falha de um lembrete, o método existente
+`NotificacaoService.processar(Lembrete)` programa um reenvio para imediato e
+aciona novamente o processamento do mesmo lembrete, sem ação do professor.
+O histórico já existente permite reconhecer essa condição: há somente uma
+tentativa Enviado/Falha para aquele lembrete, e seu resultado é Falha. Ignorado
+e registros de outros lembretes não entram nessa contagem; não há contador novo.
+A nova execução mantém as verificações de Enviado, prazo e pendências atuais.
+
+| Etapa do cenário | Resultado no modelo |
+| --- | --- |
+| A primeira tentativa de 25/08 às 09:00 falha | Preservar a Falha e programar proximoReenvioEm para imediato. |
+| O serviço executa o reenvio e o Gmail aceita | Acrescentar a Notificacao Enviado e chamar marcarComoEnviado no mesmo lembrete. |
+| O lembrete passa para Enviado | Esvaziar proximoReenvioEm; preservar a primeira Falha e manter duas tentativas e um único lembrete enviado. |
+
+`data` e `horário` continuam sendo o agendamento original; `proximoReenvioEm`
+informa uma tentativa ainda programada, enquanto `Notificacao.dataHora` registra
+o momento de um resultado já ocorrido. As relações existentes com Lembrete e
+HistoricoNotificacoes são reutilizadas; não há método novo em NotificacaoService,
+classe nova ou seta nova.
+
+Se o reenvio imediato falhar, não há outro imediato em cadeia. A progressão de
+intervalos, a programação e seleção das tentativas futuras, o cancelamento e a
+concorrência permanecem nos seus cenários em revisão. O cenário de reenvio
+temporário continua Parcial até validar a diferença de linguagem entre motivo
+da notificação e descricaoFalha; seus nomes e passos Gherkin são preservados.
 
 ## 8. Trabalhar em equipe com branches e PRs
 

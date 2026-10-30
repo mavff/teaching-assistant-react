@@ -130,16 +130,43 @@ concorrente implementados na aplicação.
 | [Envio independente de lembretes para múltiplas turmas](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L295) | Parcial | Busca e pendências ficam restritas à turma indicada, com o mesmo emailProfessor e contrato de EmailSender. O comentário complementar sobre processar foi dispensado pelo responsável e deixa de ser uma alteração pendente. A classificação foi preservada até a conclusão da revisão do cenário. |
 | [Bloqueio de envio de lembrete não agendado](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L316) | Regra central representada | processarAgendados consulta buscarLembretesPara na configuração da turma; lista vazia rejeita a solicitação sem email ou tentativa, preservando prazo, lembretes e histórico. |
 | [Bloqueio de criação de novo lembrete após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L335) | Regra central representada | Class.prazoEncerrado verifica o instante do serviço; configurarLembretes rejeita criação com o motivo Prazo acadêmico encerrado, sem alterar configuração, enviados ou histórico nem solicitar email. |
-| [Reenvio automático após falha temporária](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L354) | Parcial | Falha, sucesso posterior e um único lembrete Enviado estão descritos; faltam disparo imediato e controle dos reenvios programados. |
+| [Reenvio automático após falha temporária](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L354) | Parcial | proximoReenvioEm e programarReenvio representam a programação; processar aciona um único reenvio imediato após a primeira Falha e marcarComoEnviado esvazia a programação após o sucesso. Preservam-se duas tentativas e um único lembrete enviado. Falta validar motivo versus descricaoFalha nos passos de falha do cenário. |
 | [Prevenção de envio duplicado por reprocessamento de lembrete já enviado](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L376) | Regra central representada | `jaFoiEnviado()` faz `processar` encerrar sem novo email, notificação de tentativa ou reenvio; preserva lembrete e histórico. |
 | [Bloqueio de novo reenvio após sucesso de tentativa anterior](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L394) | Regra central representada | O mesmo bloqueio preserva as duas notificações anteriores e impede uma terceira tentativa quando o estado recebido já é Enviado. |
-| [Reenvio progressivo após falhas persistentes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L412) | Parcial | Cada falha pode ser registrada sem marcar o lembrete como enviado; faltam progressão de intervalos e programação das próximas tentativas. |
+| [Reenvio progressivo após falhas persistentes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L412) | Parcial | O campo e a operação de programação existem, e cada falha preserva o histórico e o estado de aguardando envio. Faltam a regra dos intervalos, a coordenação e a seleção das tentativas futuras; este incremento cobre apenas o primeiro reenvio imediato. |
 | [Prevenção de envio duplicado por processamento concorrente](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L432) | Pendente | Duas execuções podem observar o estado ainda não enviado. Consulta e marcação, isoladamente, não garantem um único envio ou registro. |
 | [Cancelamento de reenvio após resolução das pendências](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L448) | Pendente | A consulta das notas atuais pode identificar uma lista vazia; faltam a decisão de cancelar, a transição para Cancelado com motivo e a retirada dos reenvios. Rejeitar marcação de Cancelado não efetua esse cancelamento. |
 | [Interrupção dos reenvios após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L470) | Parcial | processar verifica o prazo antes da tentativa e retorna Prazo acadêmico encerrado, sem email ou novo registro, preservando o estado e o histórico; faltam transição para Cancelado, preservação do motivo e interrupção dos reenvios programados. |
 
 Resultado da análise: 18 regras centrais representadas (12 GUI e 6 service),
 5 cenários parciais e 2 pendentes. Isso não equivale a 18 cenários completos passando.
+
+## Primeiro reenvio imediato após falha temporária
+
+Foram aprovados `Lembrete.proximoReenvioEm` e
+`Lembrete.programarReenvio(dataHora)`, além de esvaziar esse campo ao passar para
+Enviado em `marcarComoEnviado()`. Vazio significa nenhum reenvio programado;
+identidade, data e horário originais, estado e motivo são preservados ao programar.
+Não são acrescentados contadores, classes, relações ou métodos no serviço.
+
+Depois de registrar a primeira tentativa Falha, o método existente
+NotificacaoService.processar programa para imediato e aciona novamente o mesmo
+lembrete, sem ação do professor. A primeira falha é reconhecida pelo histórico
+existente do mesmo lembrete: somente uma tentativa, com resultado Falha. As
+consultas consideram Enviado/Falha, excluindo Ignorado e outros lembretes.
+A nova execução preserva os bloqueios de Enviado e prazo e consulta as notas atuais.
+
+No cenário de 25/08 às 09:00, a primeira Falha é preservada e o reenvio aceito
+produz outra Notificacao Enviado. O mesmo lembrete passa para Enviado, com
+proximoReenvioEm vazio, duas tentativas no histórico e um único lembrete enviado.
+O campo guarda a próxima tentativa; não substitui o agendamento original nem
+Notificacao.dataHora, que registra um resultado já ocorrido.
+
+Se o reenvio imediato também falhar, não há novo imediato em cadeia. As regras
+de intervalos, de programação e seleção das próximas tentativas, cancelamentos
+e concorrência continuam em revisão. Os nomes, passos, tags e classificações
+Gherkin são preservados; o cenário continua Parcial pela diferença entre motivo
+e descricaoFalha, ainda não validada. Nenhum teste da aplicação foi executado.
 
 ## Nome do serviço compartilhado
 
