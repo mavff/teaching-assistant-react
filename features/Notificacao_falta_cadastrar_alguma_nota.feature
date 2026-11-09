@@ -349,20 +349,20 @@ Feature: Notificações de pendências no lançamento de notas
 
    
    
-   @service # //parcial DDD
-   # DDD: proximoReenvioEm e programarReenvio representam a programação; processar aciona um único reenvio imediato após a primeira Falha e marcarComoEnviado limpa a programação após o sucesso; falta validar motivo versus descricaoFalha nos passos de falha.
+   @service # //ok DDD (regra central)
+   # DDD: proximoReenvioEm e programarReenvio representam a programação; processar aciona um único reenvio imediato após a primeira Falha e marcarComoEnviado limpa a programação após o sucesso; os dois passos da falha preservam o erro como descrição da falha, conforme o campo descricaoFalha.
    Scenario: Reenvio automático após falha temporária
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
       And "João da Silva" está sem nota cadastrada em "Prova de SOLID e Padrões de Projeto"
       And a turma possui um lembrete programado para "25/08/2026 às 09:00"
       And o prazo acadêmico da turma "2026.2 de ESS" é "31/08/2026 às 23:59"
-      And o histórico de "Paulo Borba" registra apenas uma tentativa de envio desse lembrete, em "25/08/2026 às 09:00", com status "Falha" e motivo "Indisponibilidade temporária do serviço de e-mail"
+      And o histórico de "Paulo Borba" registra apenas uma tentativa de envio desse lembrete, em "25/08/2026 às 09:00", com status "Falha" e descrição da falha "Indisponibilidade temporária do serviço de e-mail"
       And o lembrete aguarda reenvio imediato e o serviço de e-mail do "Gmail" está disponível
       When o serviço executa o reenvio imediato do lembrete
       Then o reenvio é aceito pelo "Gmail" para o endereço "paulo.borba@example.com"
       And o e-mail identifica a turma "2026.2 de ESS" e a pendência de "João da Silva" em "Prova de SOLID e Padrões de Projeto"
-      And o histórico de "Paulo Borba" preserva a tentativa de "25/08/2026 às 09:00" com status "Falha" e motivo "Indisponibilidade temporária do serviço de e-mail"
+      And o histórico de "Paulo Borba" preserva a tentativa de "25/08/2026 às 09:00" com status "Falha" e descrição da falha "Indisponibilidade temporária do serviço de e-mail"
       And o reenvio imediato é registrado no histórico de "Paulo Borba" com status "Enviado"
       And o histórico apresenta apenas as duas tentativas desse lembrete, uma com status "Falha" e outra com status "Enviado"
       And o lembrete de "25/08/2026 às 09:00" é contabilizado como um único lembrete enviado
@@ -407,19 +407,19 @@ Feature: Notificações de pendências no lançamento de notas
       And nenhum novo reenvio é programado
       And o lembrete continua contabilizado como um único envio
 
-   @service # //parcial DDD
-   # DDD: Cada falha pode ser registrada sem marcar o lembrete como enviado; faltam progressão de intervalos e programação das próximas tentativas.
+   @service # //ok DDD (regra central)
+   # DDD: processarReenvios seleciona proximoReenvioEm preenchido e já alcançado e chama processar; a terceira Falha de 09:01 preserva as anteriores e programa 09:03 pelo cálculo existente; os dois passos de erro usam descrição da falha, conforme descricaoFalha.
    Scenario: Reenvio progressivo após falhas persistentes
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
       And "João da Silva" está sem nota cadastrada em "Prova de SOLID e Padrões de Projeto"
       And a turma possui um lembrete programado para "25/08/2026 às 09:00"
       And o prazo acadêmico da turma "2026.2 de ESS" é "31/08/2026 às 23:59"
-      And o histórico de "Paulo Borba" registra duas tentativas desse lembrete, a primeira em "25/08/2026 às 09:00" e a segunda imediatamente após a primeira, ambas com status "Falha" e motivo "Indisponibilidade temporária do serviço de e-mail"
+      And o histórico de "Paulo Borba" registra duas tentativas desse lembrete, a primeira em "25/08/2026 às 09:00" e a segunda imediatamente após a primeira, ambas com status "Falha" e descrição da falha "Indisponibilidade temporária do serviço de e-mail"
       And existe um terceiro envio programado para "25/08/2026 às 09:01"
       And o serviço de e-mail do "Gmail" permanece indisponível em "25/08/2026 às 09:01"
       When o serviço executa o terceiro envio em "25/08/2026 às 09:01"
-      Then a terceira tentativa é registrada no histórico de "Paulo Borba", em "25/08/2026 às 09:01", com status "Falha" e motivo "Indisponibilidade temporária do serviço de e-mail"
+      Then a terceira tentativa é registrada no histórico de "Paulo Borba", em "25/08/2026 às 09:01", com status "Falha" e descrição da falha "Indisponibilidade temporária do serviço de e-mail"
       And as duas tentativas anteriores permanecem registradas com status "Falha"
       And uma quarta tentativa é programada para "25/08/2026 às 09:03"
       And nenhum e-mail desse lembrete foi aceito para envio ao endereço "paulo.borba@example.com"
@@ -443,14 +443,14 @@ Feature: Notificações de pendências no lançamento de notas
       And o lembrete é contabilizado como um único envio
 
 
-   @service # //pendente DDD
-   # DDD: Faltam decisão de cancelamento, motivo, identificação das pendências resolvidas e retirada dos reenvios. Rejeitar marcação de Cancelado não efetua esse cancelamento.
+   @service # //ok DDD (regra central)
+   # DDD: No reenvio sem pendências, processar chama Lembrete.cancelar(Nenhuma nota pendente): estado Cancelado, motivo guardado e proximoReenvioEm vazio, sem email ou novo registro e preservando as três Falhas; os passos do histórico anterior usam descrição da falha para o erro, conforme descricaoFalha.
    Scenario: Cancelamento de reenvio após resolução das pendências
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
       And a nota atual de "João da Silva" em "Prova de SOLID e Padrões de Projeto" é "8,0", cadastrada em "25/08/2026 às 09:02"
-      And o histórico de "Paulo Borba" registra duas tentativas de envio do lembrete de "25/08/2026 às 09:00", a segunda imediatamente após a primeira, ambas com status "Falha" e motivo "Indisponibilidade temporária do serviço de e-mail"
-      And uma terceira tentativa em "25/08/2026 às 09:01" também está registrada com status "Falha" e o mesmo motivo
+      And o histórico de "Paulo Borba" registra duas tentativas de envio do lembrete de "25/08/2026 às 09:00", a segunda imediatamente após a primeira, ambas com status "Falha" e descrição da falha "Indisponibilidade temporária do serviço de e-mail"
+      And uma terceira tentativa em "25/08/2026 às 09:01" também está registrada com status "Falha" e a mesma descrição da falha
       And existe uma quarta tentativa de envio programada para "25/08/2026 às 09:03"
       And o prazo acadêmico da turma "2026.2 de ESS" é "31/08/2026 às 23:59"
       When o serviço processa o reenvio do lembrete em "25/08/2026 às 09:03"
@@ -465,15 +465,15 @@ Feature: Notificações de pendências no lançamento de notas
 
 
 
-   @service # //parcial DDD
-   # DDD: processar verifica o prazo antes da tentativa e retorna Prazo acadêmico encerrado, sem email ou novo registro, preservando o estado e o histórico; faltam transição para Cancelado, preservação do motivo e interrupção dos reenvios programados.
+   @service # //ok DDD (regra central)
+   # DDD: No reenvio após o prazo, processar chama Lembrete.cancelar(Prazo acadêmico encerrado): estado Cancelado, motivo guardado e proximoReenvioEm vazio, sem email ou novo registro e preservando as três Falhas; os passos do histórico anterior usam descrição da falha para o erro, conforme descricaoFalha.
    Scenario: Interrupção dos reenvios após o prazo acadêmico
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
       And "João da Silva" permanece sem nota cadastrada em "Prova de SOLID e Padrões de Projeto"
       And o prazo acadêmico da turma "2026.2 de ESS" é "31/08/2026 às 23:59"
-      And o histórico de "Paulo Borba" registra duas tentativas de envio do lembrete de "31/08/2026 às 23:57", a segunda imediatamente após a primeira, ambas com status "Falha" e motivo "Indisponibilidade temporária do serviço de e-mail"
-      And uma terceira tentativa em "31/08/2026 às 23:58" também está registrada com status "Falha" e o mesmo motivo
+      And o histórico de "Paulo Borba" registra duas tentativas de envio do lembrete de "31/08/2026 às 23:57", a segunda imediatamente após a primeira, ambas com status "Falha" e descrição da falha "Indisponibilidade temporária do serviço de e-mail"
+      And uma terceira tentativa em "31/08/2026 às 23:58" também está registrada com status "Falha" e a mesma descrição da falha
       And existe uma quarta tentativa de envio programada para "01/09/2026 às 00:00"
       When o serviço processa o reenvio do lembrete em "01/09/2026 às 00:00"
       Then o reenvio é cancelado com o motivo "Prazo acadêmico encerrado"
