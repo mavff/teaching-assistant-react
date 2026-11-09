@@ -18,8 +18,13 @@ Borba na tela inicial validada, preservando a turma e os filtros indicados.
 Os nomes, tags e demais passos desses cenários foram mantidos. Os nomes dos
 13 cenários service permanecem inalterados. No cenário de ausência de envio,
 o Then do lembrete futuro de 29/08 foi corrigido, com aprovação, para preservar
-Não enviado, igual ao Given. Os demais passos service permanecem iguais;
-as marcações conceituais acompanham os incrementos aprovados do modelo.
+Não enviado, igual ao Given. No cenário de reenvio após falha temporária, duas
+referências à causa do erro foram corrigidas, com aprovação, de motivo para
+descrição da falha. Nos dois cenários de cancelamento, quatro referências ao erro
+anterior também foram corrigidas para descrição da falha, preservando os motivos
+de cancelamento. No cenário progressivo, duas referências ao erro também foram
+corrigidas para descrição da falha. Os demais passos service permanecem iguais; as marcações
+conceituais acompanham os incrementos aprovados do modelo.
 As outras três features continuam idênticas à origem.
 
 ## Critério de completude do DDD
@@ -70,8 +75,8 @@ resultados de execução. Cada cenário tem abaixo uma evidência ou lacuna do D
 
 `//ok DDD (regra central)` corresponde à classificação **Regra central representada**,
 com as condições e limites das seções abaixo. Não há marcação de aprovação
-integral dos cenários GUI ou service. As contagens são 12 GUI e 6 service com `//ok`,
-5 cenários com `//parcial` e 2 com `//pendente`, totalizando 12 GUI e 13 service.
+integral dos cenários GUI ou service. As contagens são 12 GUI e 10 service com `//ok`,
+2 cenários com `//parcial` e 1 com `//pendente`, totalizando 12 GUI e 13 service.
 
 ## Cenários GUI
 
@@ -130,16 +135,113 @@ concorrente implementados na aplicação.
 | [Envio independente de lembretes para múltiplas turmas](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L295) | Parcial | Busca e pendências ficam restritas à turma indicada, com o mesmo emailProfessor e contrato de EmailSender. O comentário complementar sobre processar foi dispensado pelo responsável e deixa de ser uma alteração pendente. A classificação foi preservada até a conclusão da revisão do cenário. |
 | [Bloqueio de envio de lembrete não agendado](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L316) | Regra central representada | processarAgendados consulta buscarLembretesPara na configuração da turma; lista vazia rejeita a solicitação sem email ou tentativa, preservando prazo, lembretes e histórico. |
 | [Bloqueio de criação de novo lembrete após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L335) | Regra central representada | Class.prazoEncerrado verifica o instante do serviço; configurarLembretes rejeita criação com o motivo Prazo acadêmico encerrado, sem alterar configuração, enviados ou histórico nem solicitar email. |
-| [Reenvio automático após falha temporária](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L354) | Parcial | proximoReenvioEm e programarReenvio representam a programação; processar aciona um único reenvio imediato após a primeira Falha e marcarComoEnviado esvazia a programação após o sucesso. Preservam-se duas tentativas e um único lembrete enviado. Falta validar motivo versus descricaoFalha nos passos de falha do cenário. |
+| [Reenvio automático após falha temporária](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L354) | Regra central representada | proximoReenvioEm e programarReenvio representam a programação; processar aciona um único reenvio imediato após a primeira Falha e marcarComoEnviado esvazia a programação após o sucesso. Preservam-se duas tentativas e um único lembrete enviado. A correção aprovada dos dois passos usa descrição da falha para o erro, conforme descricaoFalha. |
 | [Prevenção de envio duplicado por reprocessamento de lembrete já enviado](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L376) | Regra central representada | `jaFoiEnviado()` faz `processar` encerrar sem novo email, notificação de tentativa ou reenvio; preserva lembrete e histórico. |
 | [Bloqueio de novo reenvio após sucesso de tentativa anterior](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L394) | Regra central representada | O mesmo bloqueio preserva as duas notificações anteriores e impede uma terceira tentativa quando o estado recebido já é Enviado. |
-| [Reenvio progressivo após falhas persistentes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L412) | Parcial | O campo e a operação de programação existem, e cada falha preserva o histórico e o estado de aguardando envio. Faltam a regra dos intervalos, a coordenação e a seleção das tentativas futuras; este incremento cobre apenas o primeiro reenvio imediato. |
+| [Reenvio progressivo após falhas persistentes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L412) | Regra central representada | processarReenvios consulta a configuração da turma, seleciona proximoReenvioEm preenchido e menor ou igual ao instante atual e delega a processar. A terceira Falha de 09:01 preserva as anteriores e programa 09:03 pelo cálculo existente. A correção aprovada dos dois passos usa descrição da falha para o erro, conforme descricaoFalha. |
 | [Prevenção de envio duplicado por processamento concorrente](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L432) | Pendente | Duas execuções podem observar o estado ainda não enviado. Consulta e marcação, isoladamente, não garantem um único envio ou registro. |
-| [Cancelamento de reenvio após resolução das pendências](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L448) | Pendente | A consulta das notas atuais pode identificar uma lista vazia; faltam a decisão de cancelar, a transição para Cancelado com motivo e a retirada dos reenvios. Rejeitar marcação de Cancelado não efetua esse cancelamento. |
-| [Interrupção dos reenvios após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L470) | Parcial | processar verifica o prazo antes da tentativa e retorna Prazo acadêmico encerrado, sem email ou novo registro, preservando o estado e o histórico; faltam transição para Cancelado, preservação do motivo e interrupção dos reenvios programados. |
+| [Cancelamento de reenvio após resolução das pendências](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L448) | Regra central representada | processar consulta as notas atuais e chama Lembrete.cancelar(Nenhuma nota pendente) no reenvio: estado Cancelado, motivo preservado e proximoReenvioEm vazio, sem email ou novo registro e com as três Falhas anteriores intactas. A correção aprovada usa descrição da falha nos dois passos do histórico anterior, conforme descricaoFalha. |
+| [Interrupção dos reenvios após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L470) | Regra central representada | processar verifica o prazo e chama Lembrete.cancelar(Prazo acadêmico encerrado) no reenvio: estado Cancelado, motivo guardado e proximoReenvioEm vazio, sem email ou novo registro e com as três Falhas anteriores intactas. A correção aprovada usa descrição da falha nos dois passos do histórico anterior, conforme descricaoFalha. |
 
-Resultado da análise: 18 regras centrais representadas (12 GUI e 6 service),
-5 cenários parciais e 2 pendentes. Isso não equivale a 18 cenários completos passando.
+Resultado da análise: 22 regras centrais representadas (12 GUI e 10 service),
+2 cenários parciais e 1 pendente. Isso não equivale a 22 cenários completos passando.
+
+## Seleção e execução dos reenvios cujo horário chegou
+
+`NotificacaoService.processarReenvios(turma)` concentra a seleção pelo horário
+de reenvio e reutiliza `processar(Lembrete)` para tratar cada lembrete escolhido.
+O serviço localiza a Class por Classes.buscar, obtém sua configuração por
+obterConfiguracaoLembretes e usa ConfiguracaoLembretes.listar, pelos caminhos existentes.
+
+O serviço obtém uma vez o instante atual do servidor para selecionar somente os
+lembretes dessa configuração com proximoReenvioEm preenchido e menor ou igual
+àquele instante. A lista de selecionados é formada antes do processamento, e
+cada selecionado é encaminhado uma vez a processar nessa chamada. Não há nova
+seleção na mesma chamada nem alteração do agendamento original.
+
+| Instante atual | proximoReenvioEm | Ação |
+| --- | --- | --- |
+| 09:00 | 09:01 | Não encaminhar |
+| 09:01 | 09:01 | Chamar processar para esse lembrete |
+| 09:02 | 09:03 | Não encaminhar a quarta tentativa ainda |
+
+No cenário progressivo, a seleção de 09:01 leva à terceira tentativa. processar
+verifica estado, prazo e pendências e registra a Falha; o cálculo e a programação
+existentes passam proximoReenvioEm para 09:03, sem executar esse quarto envio antes
+do horário. Com lista vazia, não há email, registro ou alteração dos dados.
+
+Selecionar não autoriza email automaticamente: as regras de Enviado, Cancelado,
+prazo e notas permanecem em processar. Não há campo, classe ou seta nova, nem
+ação do professor na GUI. Esta é a entrada do processamento automático dos reenvios;
+o mecanismo técnico de disparo não é implementado nesta análise de DDD.
+A seleção considera execução sequencial e não resolve a concorrência.
+
+O cenário progressivo tem Regra central representada: foram corrigidas, com
+aprovação, somente duas expressões dos passos de erro, de motivo para descrição
+da falha. Nome, tags, horários e demais passos são preservados. A correção não
+altera o DDD ou o PNG; não há testes da aplicação executados.
+
+## Cálculo do próximo reenvio no cenário progressivo
+
+Foi aprovado `NotificacaoService.calcularProximoReenvio(lembrete, instanteAtual)`.
+O método lê o histórico existente do mesmo lembrete pela origem e considera apenas
+as tentativas Enviado/Falha, excluindo Ignorado e registros de outros lembretes.
+No fluxo de falhas deste cenário, a quantidade é derivada desses registros,
+sem contador ou atributo adicional. instanteAtual é recebido do serviço e corresponde
+ao processamento da tentativa que acabou de falhar.
+
+| Tentativas com Falha no cenário | Horário devolvido |
+| --- | --- |
+| Uma | instanteAtual, preservando o primeiro reenvio imediato |
+| Duas | instanteAtual mais 1 minuto: próxima tentativa às 09:01 no cenário |
+| Três | instanteAtual mais 2 minutos: falha às 09:01 retorna 09:03 |
+
+O cálculo apenas devolve o horário; não altera dados, consulta o relógio, envia
+email ou registra Notificacao. Após registrar a Falha, o método existente
+processar utiliza o resultado para chamar Lembrete.programarReenvio(dataHora).
+Os horários futuros são guardados em proximoReenvioEm sem novo envio imediato.
+O agendamento original de 09:00, as três Falhas anteriores, as notas, o prazo e
+o estado de aguardando envio permanecem iguais; o lembrete não é contado como Enviado.
+
+As relações existentes com HistoricoNotificacoes e Lembrete são reutilizadas.
+Não há novo campo, contador, classe ou seta. A regra cobre os intervalos exigidos
+até a quarta tentativa, sem inferir outros intervalos ou limites de tentativas.
+processarReenvios representa a seleção pelos horários alcançados e delega a
+execução a processar, conforme a seção acima. A correção aprovada dos dois passos
+de erro alinha a descrição da falha a descricaoFalha e permite classificar o cenário
+como Regra central representada. Nome, tags e demais passos são preservados;
+não foram executados testes da aplicação.
+
+## Cancelamento de reenvios por notas preenchidas ou prazo encerrado
+
+Foi aprovado apenas `Lembrete.cancelar(motivo)`, reutilizando os atributos
+existentes: estado passa para Cancelado, motivo recebe a justificativa e
+proximoReenvioEm fica vazio. Identidade, data, horário, participação na configuração,
+outros lembretes, notas e histórico são preservados. O método não consulta notas
+ou relógio, remove o lembrete, envia email nem registra Notificacao.
+
+NotificacaoService.processar utiliza os caminhos existentes para verificar o
+prazo e as pendências atuais do reenvio programado. Enviado e Cancelado encerram
+novas solicitações sem outra tentativa ou programação. No reenvio ativo:
+
+| Cenário | Motivo do cancelamento | Resultado preservado |
+| --- | --- | --- |
+| Nota preenchida às 09:02 antes do reenvio de 09:03 | Nenhuma nota pendente | Cancelado, sem programação, sem quarto email e com as três Falhas anteriores. |
+| Prazo 31/08 às 23:59, reenvio em 01/09 às 00:00 | Prazo acadêmico encerrado | Cancelado, sem programação, sem quarto email e com as três Falhas anteriores, mesmo havendo nota pendente. |
+
+Não há novo atributo, classe, relação ou método no serviço. A seta existente
+NotificacaoService → Lembrete permite chamar cancelar. Não se cria Notificacao
+Ignorado ou Cancelado nesses dois casos, nem se contabiliza o lembrete como
+Enviado. A primeira tentativa após o prazo preserva seu bloqueio anterior; o
+primeiro processamento sem pendências e sem tentativa anterior permanece Ignorado.
+
+Os nomes, tags e demais passos Gherkin são preservados. Com aprovação, foram
+corrigidas apenas quatro referências nos passos do histórico anterior: motivo
+passa para descrição da falha, e o mesmo motivo passa para a mesma descrição da
+falha. Os motivos de cancelamento Nenhuma nota pendente e Prazo acadêmico encerrado
+permanecem iguais. Os dois cenários passam de Parciais para Regra central representada;
+o DDD e o PNG permanecem inalterados por essa correção textual.
+Nenhum teste da aplicação foi executado.
 
 ## Primeiro reenvio imediato após falha temporária
 
@@ -162,11 +264,18 @@ proximoReenvioEm vazio, duas tentativas no histórico e um único lembrete envia
 O campo guarda a próxima tentativa; não substitui o agendamento original nem
 Notificacao.dataHora, que registra um resultado já ocorrido.
 
-Se o reenvio imediato também falhar, não há novo imediato em cadeia. As regras
-de intervalos, de programação e seleção das próximas tentativas, cancelamentos
-e concorrência continuam em revisão. Os nomes, passos, tags e classificações
-Gherkin são preservados; o cenário continua Parcial pela diferença entre motivo
-e descricaoFalha, ainda não validada. Nenhum teste da aplicação foi executado.
+Se o reenvio imediato também falhar, não há novo imediato em cadeia. Os intervalos
+de 1 e 2 minutos e a programação estão definidos no cálculo acima. A seleção e
+execução são coordenadas por processarReenvios e processar; a concorrência continua em revisão.
+O cancelamento é descrito no incremento acima. A correção aprovada altera apenas duas
+expressões nos passos de falha deste cenário: a causa do erro passa a ser
+descrição da falha, correspondente a descricaoFalha, em vez de motivo.
+O cenário passa para Regra central representada, com nome, tags e demais passos
+preservados. Os demais cenários mantêm suas classificações nesse incremento.
+As referências ao erro nos dois cenários de cancelamento foram corrigidas no
+incremento acima; as referências ao erro no cenário progressivo também foram alinhadas
+a descrição da falha no respectivo ajuste aprovado.
+Nenhum teste da aplicação foi executado.
 
 ## Nome do serviço compartilhado
 
@@ -199,8 +308,8 @@ a única correção aprovada no cenário ajusta o Then do lembrete futuro.
 O cenário passa para Regra central representada: a transição, a decisão de não
 enviar e o registro do processamento Ignorado estão representados, e a correção
 aprovada preserva Não enviado para o lembrete de 29/08 no Given e no Then.
-Esse lembrete futuro não foi processado. Não há alteração no DDD ou no PNG,
-unificação geral de estados ou definição de cancelamento de reenvios.
+Esse lembrete futuro não foi processado. A correção do Then não alterou o DDD
+ou o PNG nem unificou estados. O cancelamento foi definido no incremento próprio.
 
 A proposta de acrescentar `registrarProcessamento`, coleção ou classe de registro
 foi substituída pelo reaproveitamento aprovado de Notificacao e dos métodos
@@ -236,8 +345,7 @@ dados históricos existentes, sem alterar registros.
 O reaproveitamento preservou os nomes, passos, tags e classificações dos cenários.
 A correção aprovada do Then de 29/08 encerra a divergência de estado e permite
 classificar a ausência de envio como Regra central representada. Os demais
-cenários preservam suas classificações; cancelamento, reenvios e concorrência
-continuam em revisão.
+cenários preservam suas classificações nesse reaproveitamento. A concorrência continua em revisão.
 
 ## Destinatário dos lembretes
 
@@ -303,8 +411,8 @@ preserva os dados e não solicita email ou registra tentativa de envio.
 O cenário passa de Pendente para Regra central representada. A lista
 pendenciasRegistradas de uma Notificacao antiga preserva o histórico e não
 substitui a consulta das notas atuais. Os nomes e passos Gherkin são preservados;
-o disparo automático, o envio e as transições de Ignorado e Cancelado seguem
-para os respectivos cenários ainda em revisão.
+o processamento dos reenvios é coordenado pela entrada processarReenvios, descrita acima.
+As regras de Ignorado e Cancelado estão descritas nos incrementos acima.
 
 ## Percurso da consulta da configuração de lembretes
 
@@ -380,14 +488,16 @@ foi aprovada com a tela inicial explícita em cada cenário GUI, conforme a matr
 Os percursos são uma verificação conceitual das regras, sem implementação na
 aplicação. O estado Ignorado, seu registro e a consulta de pendências foram
 aprovados nos incrementos descritos acima. A obtenção automática de vencidos,
-o disparo dessa entrada, o cancelamento, os reenvios e a concorrência permanecem abertos.
+o mecanismo técnico de disparo dessa entrada e a concorrência não são implementados
+nesta análise; processarReenvios representa a seleção e execução dos reenvios.
 
 ## Percursos do bloqueio por prazo no processamento
 
 - **Reenvio após o prazo:** com prazo em 31/08/2026 às 23:59 e processamento em
   01/09/2026 às 00:00, processar verifica o prazo antes de EmailSender. Retorna
-  Prazo acadêmico encerrado, sem email ou tentativa, preservando as três falhas
-  anteriores e o identificador, agendamento e estado do lembrete.
+  Prazo acadêmico encerrado e chama cancelar, sem email ou nova tentativa,
+  preservando as três falhas anteriores, id e agendamento; o estado passa para
+  Cancelado, o motivo é guardado e proximoReenvioEm fica vazio.
 - **Primeira tentativa após o prazo:** aplicar o mesmo bloqueio, sem alterar os
   dados do lembrete, da turma ou do histórico.
 - **Antes ou exatamente no prazo:** a consulta retorna falso e o serviço continua
@@ -396,10 +506,11 @@ o disparo dessa entrada, o cancelamento, os reenvios e a concorrência permanece
 - **Enviado após o prazo:** o bloqueio de reprocessamento continua sendo a primeira
   verificação; não há nova tentativa ou mudança de Enviado para outro estado.
 
-O cenário de interrupção passou de Pendente para Parcial. Retornar o motivo não
-preserva uma explicação histórica nem muda o lembrete para Cancelado ou encerra
-agendamentos existentes. Por isso ele ainda não recebe `//ok`. O incremento não
-acrescenta atributos, operações ou relações; os percursos são conceituais.
+O cenário de interrupção tem Regra central representada. O comportamento inclui
+cancelar e preservar o motivo no atributo existente, encerrando a programação.
+A correção aprovada dos dois passos do histórico usa descrição da falha para o
+erro anterior, preservando o motivo de cancelamento. Essa correção não altera
+o DDD ou o PNG; os percursos continuam conceituais.
 
 ## Percursos da consulta de uma falha no histórico
 
