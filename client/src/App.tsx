@@ -7,6 +7,7 @@ import StudentList from './components/StudentList';
 import StudentForm from './components/StudentForm';
 import Evaluations from './components/Evaluations';
 import Classes from './components/Classes';
+import AcademicPeriodSettings from './components/AcademicPeriodSettings';
 import './App.css';
 
 type TabType = 'students' | 'evaluations' | 'classes';
@@ -207,13 +208,16 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'classes' && (
-            <Classes
-              classes={classes}
-              onClassAdded={handleClassAdded}
-              onClassUpdated={handleClassUpdated}
-              onClassDeleted={handleClassDeleted}
-              onError={handleError}
-            />
+            <>
+              <AcademicPeriodSettings />{/* Apresenta a configuração do período somente na aba Classes. */}
+              <Classes
+                classes={classes}
+                onClassAdded={handleClassAdded}
+                onClassUpdated={handleClassUpdated}
+                onClassDeleted={handleClassDeleted}
+                onError={handleError}
+              />
+            </>
           )}
         </div>
       </main>
