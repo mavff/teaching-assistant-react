@@ -2,7 +2,7 @@ import { Class } from '../models/Class';
 import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from '../models/EspecificacaoDoCalculoDaMedia';
 
 /**
- * Testes unitários de Class: prazo acadêmico e limites de encerramento.
+ * Testes unitários de Class: prazo acadêmico, JSON e compatibilidade com dados antigos.
  * Apoiam o bloqueio de criação e a interrupção de reenvios após o prazo, conforme o DDD.
  * Datas fixas são exemplos; os testes não cobrem GUI, HTTP, arquivos ou cenários completos.
  */
@@ -56,4 +56,36 @@ describe('Prazo acadêmico da turma', () => {
     expect(turma.getPrazoAcademico()).toEqual(prazoAcademico); // Consultar o encerramento não modifica o prazo da turma.
   });
 
+  // Teste unitário de serialização: verifica o formato padronizado usado para transportar e armazenar o prazo.
+  test('representa o prazo em ISO preservando o instante original', () => {
+    turma.setPrazoAcademico(prazoAcademico);
+
+    expect(turma.toJSON().prazoAcademico)
+      .toBe('2026-09-01T02:59:00.000Z'); // Confere a representação UTC do prazo definido no fuso -03:00.
+  });
+
+  // Teste unitário de ida e volta: verifica se a conversão para JSON e a reconstrução preservam o prazo.
+  test('recupera o mesmo prazo após converter a turma para JSON', () => {
+    turma.setPrazoAcademico(prazoAcademico);
+
+    const dados = JSON.parse(JSON.stringify(turma.toJSON())); // Simula a conversão para texto JSON e sua leitura, sem acessar arquivos.
+    const turmaRecuperada = Class.fromJSON(dados, []); // Reconstrói a turma; não há alunos neste caso de teste.
+
+    expect(turmaRecuperada.getPrazoAcademico()).toEqual(prazoAcademico);
+  });
+
+  // Teste unitário de compatibilidade: verifica a leitura do formato anterior, que não possuía prazo.
+  test('recupera uma turma antiga sem inventar um prazo acadêmico', () => {
+    const dadosAntigos = {
+      topic: 'ESS',
+      semester: 2,
+      year: 2026,
+      especificacaoDoCalculoDaMedia: DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA.toJSON(),
+      enrollments: []
+    }; // Representa os dados de uma turma anterior à inclusão do campo prazoAcademico.
+
+    const turmaRecuperada = Class.fromJSON(dadosAntigos, []);
+
+    expect(turmaRecuperada.getPrazoAcademico()).toBeNull();
+  });
 });

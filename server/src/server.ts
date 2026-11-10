@@ -48,6 +48,7 @@ const saveDataToFile = (): void => {
         topic: classObj.getTopic(),
         semester: classObj.getSemester(),
         year: classObj.getYear(),
+        prazoAcademico: classObj.getPrazoAcademico()?.toISOString() ?? null, // Inclui o prazo no JSON persistido junto dos dados da turma.
         especificacaoDoCalculoDaMedia: classObj.getEspecificacaoDoCalculoDaMedia().toJSON(),
         enrollments: classObj.getEnrollments().map(enrollment => ({
           studentCPF: enrollment.getStudent().getCPF(),
@@ -93,6 +94,11 @@ const loadDataFromFile = (): void => {
         data.classes.forEach((classData: any) => {
           try {
             const classObj = new Class(classData.topic, classData.semester, classData.year, EspecificacaoDoCalculoDaMedia.fromJSON(classData.especificacaoDoCalculoDaMedia));
+
+            if (classData.prazoAcademico !== undefined && classData.prazoAcademico !== null) {
+              classObj.setPrazoAcademico(new Date(classData.prazoAcademico)); // Restaura o prazo usando a validação da entidade.
+            }
+
             classes.addClass(classObj);
 
             // Load enrollments for this class

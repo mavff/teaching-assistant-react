@@ -127,13 +127,21 @@ export class Class {
       topic: this.topic,
       semester: this.semester,
       year: this.year,
+      prazoAcademico: this.prazoAcademico?.toISOString() ?? null, // Converte a data para texto ISO; mantém null quando não existe prazo.
       especificacaoDoCalculoDaMedia: this.especificacaoDoCalculoDaMedia.toJSON(),
       enrollments: this.enrollments.map(enrollment => enrollment.toJSON())
     };
   }
 
   // Create Class from JSON object
-  static fromJSON(data: { topic: string; semester: number; year: number; especificacaoDoCalculoDaMedia: any, enrollments: any[] }, allStudents: Student[]): Class {
+  static fromJSON(data: {
+    topic: string;
+    semester: number;
+    year: number;
+    especificacaoDoCalculoDaMedia: any;
+    enrollments: any[];
+    prazoAcademico?: string | null; // O campo pode estar ausente em dados antigos ou ser null em turmas sem prazo.
+  }, allStudents: Student[]): Class {
     const enrollments = data.enrollments
       ? data.enrollments.map((enrollmentData: any) => {
           const student = allStudents.find(s => s.getCPF() === enrollmentData.student.cpf);
@@ -147,6 +155,12 @@ export class Class {
     // Novo carregamento do EspecificacaoDoCalculoDaMedia
     const especificacaoDoCalculoDaMedia = EspecificacaoDoCalculoDaMedia.fromJSON(data.especificacaoDoCalculoDaMedia);
 
-    return new Class(data.topic, data.semester, data.year, especificacaoDoCalculoDaMedia, enrollments);
+    const classObj = new Class(data.topic, data.semester, data.year, especificacaoDoCalculoDaMedia, enrollments); // Reconstrói os dados existentes da turma.
+
+    if (data.prazoAcademico !== undefined && data.prazoAcademico !== null) {
+      classObj.setPrazoAcademico(new Date(data.prazoAcademico)); // Converte o texto em Date e reutiliza a validação da entidade.
+    }
+
+    return classObj; // Retorna a turma com o prazo recuperado, quando informado.
   }
 }
