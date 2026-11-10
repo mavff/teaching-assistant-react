@@ -301,14 +301,23 @@ app.get('/api/classes', (req: Request, res: Response) => {
 // POST /api/classes - Add a new class
 app.post('/api/classes', (req: Request, res: Response) => {
   try {
-    const { topic, semester, year } = req.body;
+    const { topic, semester, year, prazoAcademico } = req.body; // Obtém os dados da turma e o prazo informado pelo professor.
     
     if (!topic || !semester || !year) {
       return res.status(400).json({ error: 'Topic, semester, and year are required' });
     }
 
     const classObj = new Class(topic, semester, year, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
-    const newClass = classes.addClass(classObj);
+
+    if (prazoAcademico !== undefined) { // Mantém a compatibilidade com chamadas antigas que não enviavam prazo.
+      if (typeof prazoAcademico !== 'string') { // Verifica o formato recebido pelo HTTP antes de convertê-lo em Date.
+        return res.status(400).json({ error: 'Prazo acadêmico inválido' });
+      }
+
+      classObj.setPrazoAcademico(new Date(prazoAcademico)); // Converte o texto e delega a validação da data à entidade Class.
+    }
+
+    const newClass = classes.addClass(classObj); // Registra a turma somente após validar os dados fornecidos.
     triggerSave(); // Save to file after adding class
     res.status(201).json(newClass.toJSON());
   } catch (error) {
@@ -320,7 +329,7 @@ app.post('/api/classes', (req: Request, res: Response) => {
 app.put('/api/classes/:id', (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { topic, semester, year } = req.body;
+    const { topic, semester, year, prazoAcademico } = req.body; // Recebe os dados da turma e, quando informado, o novo prazo.
     
     if (!topic || !semester || !year) {
       return res.status(400).json({ error: 'Topic, semester, and year are required' });
@@ -329,6 +338,14 @@ app.put('/api/classes/:id', (req: Request, res: Response) => {
     const existingClass = classes.findClassById(id);
     if (!existingClass) {
       return res.status(404).json({ error: 'Class not found' });
+    }
+
+    if (prazoAcademico !== undefined) { // Altera o prazo somente quando o campo é enviado; a omissão preserva o valor anterior.
+      if (typeof prazoAcademico !== 'string') { // Rejeita valores que não podem representar a data no formato recebido pela API.
+        return res.status(400).json({ error: 'Prazo acadêmico inválido' });
+      }
+
+      existingClass.setPrazoAcademico(new Date(prazoAcademico)); // Delega à entidade a validação e a atualização do prazo.
     }
 
     // Update the class directly using setters
