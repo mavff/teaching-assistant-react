@@ -48,6 +48,13 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ // const declara o 
       return; // Preserva a configuração anterior quando o preenchimento está incompleto.
     }
 
+    const now = Date.now(); // Obtém um único instante para validar todos os lembretes.
+
+    if (datesToSave.some(date => new Date(date).getTime() < now)) {
+      setSaveError('Não é possível agendar lembretes em datas anteriores à data atual');
+      return; // Rejeita a tentativa e preserva a configuração anterior.
+    }
+
     setSavedDates(datesToSave); // Guarda a cópia em memória, sem alterar os campos que estão em edição.
     setSaveSuccess('Configuração salva com sucesso'); // Apresenta a confirmação exigida pelo cenário.
   };
