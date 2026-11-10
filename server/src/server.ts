@@ -38,10 +38,12 @@ const ensureDataDirectory = (): void => {
   }
 };
 
-const saveDataToFile = (): void => {
+const saveDataToFile = (
+  periodosParaSalvar: ReadonlyMap<string, PeriodoAcademico> = periodosAcademicos
+): boolean => { // Permite gravar uma proposta sem alterar os períodos atuais e informa se a escrita foi concluída.
   try {
     const data = {
-      periodosAcademicos: Array.from(periodosAcademicos.values()).map(periodo => ({
+      periodosAcademicos: Array.from(periodosParaSalvar.values()).map(periodo => ({
         ano: periodo.getAno(),
         semestre: periodo.getSemestre(),
         prazoAcademico: periodo.getPrazoAcademico()?.toISOString() ?? null // Grava o instante em ISO ou indica ausência de prazo.
@@ -65,9 +67,13 @@ const saveDataToFile = (): void => {
     };
     
     ensureDataDirectory();
-    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), 'utf8');
+    const arquivoTemporario = `${dataFile}.tmp-${process.pid}`;
+    fs.writeFileSync(arquivoTemporario, JSON.stringify(data, null, 2), 'utf8'); // Prepara o conteúdo completo sem substituir o arquivo atual.
+    fs.renameSync(arquivoTemporario, dataFile); // Substitui o arquivo somente após concluir a escrita.
+    return true;
   } catch (error) {
     console.error('Error saving students to file:', error);
+    return false; // A nova rota usa esse retorno para rejeitar a alteração sem modificar o período em memória.
   }
 };
 
@@ -184,6 +190,70 @@ const cleanCPF = (cpf: string): string => {
 };
 
 // Routes
+
+app.get('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response) => {
+  try {
+    const identidade = new PeriodoAcademico(Number(req.params.ano), Number(req.params.semestre)); // Valida ano e semestre sem cadastrar um período.
+    const periodo = periodosAcademicos.get(identidade.getIdentificador());
+
+    if (!periodo) {
+      return res.status(404).json({ error: 'Período acadêmico não cadastrado' });
+    }
+
+    res.json({
+      ano: periodo.getAno(),
+      semestre: periodo.getSemestre(),
+      prazoAcademico: periodo.getPrazoAcademico()?.toISOString() ?? null
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response) => {
+  try {
+    const ano = Number(req.params.ano);
+    const semestre = Number(req.params.semestre);
+    const prazoInformado = req.body?.prazoAcademico;
+
+    if (typeof prazoInformado !== 'string') {
+      return res.status(400).json({ error: 'Prazo acadêmico inválido' });
+    }
+
+    const candidato = new PeriodoAcademico(ano, semestre); // Prepara a alteração sem modificar o período atual.
+    const identificador = candidato.getIdentificador();
+    const anterior = periodosAcademicos.get(identificador);
+    const novoPrazo = new Date(prazoInformado);
+    const instanteAtual = new Date(); // O servidor fornece um único instante para toda a operação.
+
+    const configuracoes = classes.getAllClasses()
+      .filter(turma => turma.getYear() === ano && turma.getSemester() === semestre)
+      .map(turma => turma.obterConfiguracaoLembretes()); // Confere os lembretes de todas as turmas afetadas pelo prazo.
+
+    candidato.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoes); // Reutiliza as regras de datas e conflitos do domínio.
+
+    const propostaDeGravacao = new Map(periodosAcademicos);
+    propostaDeGravacao.set(identificador, candidato); // Prepara os dados que serão gravados, preservando o estado atual.
+
+    if (!isTestMode && !saveDataToFile(propostaDeGravacao)) {
+      return res.status(500).json({ error: 'Não foi possível salvar o prazo acadêmico' });
+    }
+
+    if (anterior) {
+      anterior.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoes); // Atualiza o objeto compartilhado após a gravação.
+    } else {
+      periodosAcademicos.set(identificador, candidato); // Disponibiliza o novo período após a gravação.
+    }
+
+    res.json({
+      ano,
+      semestre,
+      prazoAcademico: candidato.getPrazoAcademico()?.toISOString() ?? null
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
 
 // GET /api/students - Get all students
 app.get('/api/students', (req: Request, res: Response) => {
@@ -560,7 +630,7 @@ app.get('/api/classes/:classId/report', (req: Request, res: Response) => {
 
 
 // Export the app for testing
-export { app, studentSet, classes };
+export { app, studentSet, classes, periodosAcademicos };
 
 // Only start the server if this file is run directly (not imported for testing)
 if (require.main === module) {
