@@ -47,6 +47,7 @@ namespace Servidor {
     addStudent()
     removeStudent()
     synchronize()
+    definirPrazoAcademico(turma, novoPrazo) String
     configurarLembretes(turma, quantidade, lembretesPropostos) String
     consultarConfiguracaoLembretes(turma)
     consultarHistorico()
@@ -69,6 +70,7 @@ namespace Servidor {
   class Class {
     semester
     prazoAcademico
+    definirPrazoAcademico(novoPrazo, instanteAtual)
     prazoEncerrado(instanteAtual) boolean
     obterConfiguracaoLembretes() ConfiguracaoLembretes
     identificarPendencias(instanteAtual)
@@ -91,6 +93,7 @@ namespace Servidor {
     add(Lembrete)
     remove(Lembrete)
     atualizar(quantidade, lembretesPropostos, instanteAtual, prazoAcademico)
+    possuiAgendamentosPendentesApos(novoPrazo) boolean
     buscarLembretesPara(data, horario) Lembrete[]
     listar() Lembrete[]
   }
@@ -212,7 +215,31 @@ HistoricoNotificacoes <-- NotificacaoService
 %% A consulta preserva a turma, seus lembretes e o histórico; não consulta o relógio nem envia email.
 %% Services acessa a turma por Classes, consulta uma vez o relógio do servidor e fornece instanteAtual.
 %% O prazo dessa mesma Class é fornecido a atualizar e reagendar; não criar outra entidade para a data.
-%% A forma de cadastrar o prazo não é acrescentada neste incremento.
+%% O cadastro e a edição do prazo seguem a operação definirPrazoAcademico descrita abaixo.
+
+%% DEFINIÇÃO DO PRAZO: Services.definirPrazoAcademico(turma, novoPrazo) coordena o cadastro e a edição.
+%% No cadastro, usar a Class em criação; na edição, localizar a Class por Classes.buscar(turma).
+%% Services consulta uma vez o relógio do servidor e chama Class.definirPrazoAcademico(novoPrazo, instanteAtual).
+%% O professor informa o novo prazo; instanteAtual não vem do cliente nem é armazenado como atributo.
+%% Rejeitar uma data de prazo inválida com Prazo acadêmico inválido, sem modificar dados.
+%% Se novoPrazo for anterior a instanteAtual, rejeitar com Prazo acadêmico não pode ser anterior à data atual.
+%% A igualdade com instanteAtual é permitida, mas não dispensa a verificação dos agendamentos pendentes.
+%% Antes de alterar prazoAcademico, Class consulta sua ConfiguracaoLembretes por possuiAgendamentosPendentesApos(novoPrazo).
+%% A consulta considera os Lembretes em Não enviado ou Agendado, sem unificar esses estados.
+%% Retornar verdadeiro se a data e horário originais de algum desses lembretes forem posteriores ao novo prazo
+%% ou se seu proximoReenvioEm estiver preenchido e for posterior ao novo prazo.
+%% Agendamentos e reenvios exatamente no novo prazo são compatíveis; lista vazia retorna falso.
+%% Enviados, Ignorados e Cancelados não bloqueiam a alteração e permanecem preservados.
+%% A consulta não altera lembretes, configuração ou histórico, não consulta o relógio e não envia email.
+%% Havendo incompatibilidade, rejeitar com Prazo acadêmico incompatível com lembretes pendentes.
+%% Validar tudo antes de aplicar: qualquer rejeição preserva a turma, o prazo anterior, os lembretes e o histórico.
+%% Após aceitação, alterar somente prazoAcademico da Class correspondente; preservar as outras turmas.
+%% Não cancelar, reagendar ou excluir lembretes automaticamente; preservar ids, estados, horários e reenvios existentes.
+%% Notificacao.prazoRegistrado continua sendo o prazo histórico e não é reescrito pela edição da turma.
+%% Recuperar dados históricos já persistidos não é uma nova definição de prazo: permitir restaurar prazos passados.
+%% Turmas antigas sem prazo permanecem sem prazo; não inferir datas pelo semestre nem usar um prazo fixo.
+%% Reutilizar Services, Classes, Class, ConfiguracaoLembretes e Lembrete, sem acrescentar entidades ou relações.
+%% Estas regras estão modeladas; sua integração ao código e novos cenários de cadastro e edição continuam pendentes.
 
 %% CRIAÇÃO APÓS O PRAZO: em configurarLembretes, se a proposta incluir novo Lembrete
 %% e Class.prazoEncerrado retornar verdadeiro, rejeitar com o motivo Prazo acadêmico encerrado.
