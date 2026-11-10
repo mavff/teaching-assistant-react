@@ -4,6 +4,7 @@ import { Student } from '../types/Student';
 import ClassService from '../services/ClassService';
 import { studentService } from '../services/StudentService';
 import EnrollmentService from '../services/EnrollmentService';
+import ReminderSettings from './ReminderSettings';
 import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DE_MEDIA, EspecificacaoDoCalculoDaMedia } from '../types/EspecificacaoDoCalculoDaMedia';
 
 interface ClassesProps {
@@ -28,6 +29,7 @@ const Classes: React.FC<ClassesProps> = ({
     especificacaoDoCalculoDaMedia: DEFAULT_ESPECIFICACAO_DO_CALCULO_DE_MEDIA
   });
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [reminderClass, setReminderClass] = useState<Class | null>(null); // Guarda a turma selecionada; setReminderClass atualiza a seleção; null mantém a listagem visível.
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Student enrollment state
@@ -207,6 +209,15 @@ const Classes: React.FC<ClassesProps> = ({
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
+  if (reminderClass) { // Havendo uma turma selecionada, apresenta a configuração em lugar da listagem abaixo.
+    return ( // classInfo recebe a turma; onBack limpa a seleção e faz o React apresentar a listagem novamente.
+      <ReminderSettings
+        classInfo={reminderClass}
+        onBack={() => setReminderClass(null)}
+      />
+    );
+  }
+
   return (
     <div className="classes-container">
       <h2>Class Management</h2>
@@ -322,6 +333,12 @@ const Classes: React.FC<ClassesProps> = ({
                         title="Enroll students"
                       >
                         Enroll
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReminderClass(classObj)}
+                      >{/* type="button" evita enviar formulários; onClick guarda a turma desta linha para abrir sua configuração. */}
+                        Configurar lembretes
                       </button>
                     </td>
                   </tr>
