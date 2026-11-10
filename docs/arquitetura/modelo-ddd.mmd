@@ -47,6 +47,7 @@ namespace Servidor {
     addStudent()
     removeStudent()
     synchronize()
+    definirPrazoAcademico(ano, semestre, novoPrazo) String
     configurarLembretes(turma, quantidade, lembretesPropostos) String
     consultarConfiguracaoLembretes(turma)
     consultarHistorico()
@@ -65,13 +66,20 @@ namespace Servidor {
   class GradesImportService["Grades Import Service"]
   class Classes {
     buscar(turma) Class
+    buscarPorPeriodo(ano, semestre) Class[]
   }
   class Class {
     semester
-    prazoAcademico
-    prazoEncerrado(instanteAtual) boolean
+    obterPeriodoAcademico() PeriodoAcademico
     obterConfiguracaoLembretes() ConfiguracaoLembretes
     identificarPendencias(instanteAtual)
+  }
+  class PeriodoAcademico {
+    ano
+    semestre
+    prazoAcademico
+    prazoEncerrado(instanteAtual) boolean
+    definirPrazoAcademico(novoPrazo, instanteAtual, configuracoesDoPeriodo)
   }
   class Enrolment {
     buscarNota(avaliacao)
@@ -91,6 +99,7 @@ namespace Servidor {
     add(Lembrete)
     remove(Lembrete)
     atualizar(quantidade, lembretesPropostos, instanteAtual, prazoAcademico)
+    possuiAgendamentosPendentesApos(novoPrazo) boolean
     buscarLembretesPara(data, horario) Lembrete[]
     listar() Lembrete[]
   }
@@ -172,6 +181,11 @@ ConfiguracaoLembretes <-- Class
 ConfiguracaoLembretes *--> "*" Lembrete : lembretes
 Services --> HistoricoNotificacoes
 
+%% PRAZO COMPARTILHADO: cada turma acessa o único período correspondente ao seu ano e semestre.
+Class "*" --> "1" PeriodoAcademico : período
+Services --> PeriodoAcademico
+PeriodoAcademico --> ConfiguracaoLembretes : valida pendências
+
 %% NOTIFICAÇÃO: objeto e ligações aprovados para este incremento.
 HistoricoNotificacoes *--> "*" Notificacao
 Notificacao --> Lembrete : origem
@@ -206,16 +220,47 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Um novo lembrete recebe outra identidade; formato e geração do id ainda não estão definidos.
 %% O id permite reconhecer o mesmo lembrete, mas não garante prevenção de duplicidade.
 
-%% PRAZO DA TURMA: prazoAcademico pertence a Class; não é o semestre nem o horário do lembrete.
+%% PRAZO DO PERÍODO: prazoAcademico pertence a PeriodoAcademico, identificado por ano e semestre.
+%% Existe uma única fonte de prazo para cada combinação de ano e semestre; não criar um período por turma.
+%% Toda Class do mesmo período acessa essa fonte por obterPeriodoAcademico; não armazena nem edita um prazo próprio.
+%% As configurações e os lembretes continuam pertencendo às respectivas turmas, com datas de lembrete independentes.
+%% O período pode ser configurado antes do cadastro de turmas; um semestre de outro ano é outro período.
 %% prazoEncerrado(instanteAtual) retorna verdadeiro somente se instanteAtual for posterior ao prazoAcademico.
 %% Antes do prazo ou exatamente nele, retorna falso; isso não aprova automaticamente uma configuração ou envio.
-%% A consulta preserva a turma, seus lembretes e o histórico; não consulta o relógio nem envia email.
-%% Services acessa a turma por Classes, consulta uma vez o relógio do servidor e fornece instanteAtual.
-%% O prazo dessa mesma Class é fornecido a atualizar e reagendar; não criar outra entidade para a data.
-%% A forma de cadastrar o prazo não é acrescentada neste incremento.
+%% A consulta preserva o período, as turmas, os lembretes e o histórico; não consulta o relógio nem envia email.
+%% Services acessa a turma por Classes e obtém seu período por Class.obterPeriodoAcademico.
+%% O serviço consulta uma vez o relógio do servidor e fornece o instante e o prazo compartilhado a atualizar e reagendar.
+
+%% DEFINIÇÃO DO PRAZO: Services.definirPrazoAcademico(ano, semestre, novoPrazo) coordena o cadastro e a edição por período.
+%% Obter o único PeriodoAcademico correspondente ao ano e semestre, independentemente de haver turmas cadastradas.
+%% Classes.buscarPorPeriodo retorna todas e somente as Class desse ano e semestre, sem modificar dados.
+%% Services obtém a configuração de cada uma dessas turmas e fornece o conjunto completo em configuracoesDoPeriodo.
+%% Não receber essa lista do cliente nem validar apenas a turma que estiver aberta na interface.
+%% Consultar uma vez o relógio do servidor e chamar PeriodoAcademico.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoesDoPeriodo).
+%% O professor informa ano, semestre e novo prazo; instanteAtual não vem do cliente nem é armazenado como atributo.
+%% Rejeitar uma data de prazo inválida com Prazo acadêmico inválido, sem modificar dados.
+%% Se novoPrazo for anterior a instanteAtual, rejeitar com Prazo acadêmico não pode ser anterior à data atual.
+%% A igualdade com instanteAtual é permitida, mas não dispensa a verificação dos agendamentos pendentes.
+%% Antes de alterar prazoAcademico, PeriodoAcademico consulta cada configuração recebida por possuiAgendamentosPendentesApos(novoPrazo).
+%% Cada consulta considera seus Lembretes em Não enviado ou Agendado, sem unificar esses estados.
+%% Retornar verdadeiro se a data e horário originais de algum deles forem posteriores ao novo prazo
+%% ou se seu proximoReenvioEm estiver preenchido e for posterior ao novo prazo.
+%% Agendamentos e reenvios exatamente no novo prazo são compatíveis; lista vazia retorna falso.
+%% Enviados, Ignorados e Cancelados não bloqueiam a alteração e permanecem preservados.
+%% A consulta não altera lembretes, configuração ou histórico, não consulta o relógio e não envia email.
+%% Havendo incompatibilidade em qualquer turma do período, rejeitar a operação inteira com Prazo acadêmico incompatível com lembretes pendentes.
+%% Validar todo o conjunto antes de aplicar: qualquer rejeição preserva o prazo anterior, todas as turmas, seus lembretes e o histórico.
+%% Após aceitação, alterar somente prazoAcademico do período; todas as suas turmas passam a consultar o novo valor compartilhado.
+%% Preservar os demais períodos e as turmas a eles associadas; não distribuir cópias editáveis do prazo pelas Class.
+%% Não cancelar, reagendar ou excluir lembretes automaticamente; preservar ids, estados, horários e reenvios existentes.
+%% Notificacao.prazoRegistrado continua sendo o prazo histórico e não é reescrito pela edição do período.
+%% Recuperar períodos históricos já persistidos não é uma nova definição de prazo: permitir restaurar prazos passados.
+%% Um período sem prazo cadastrado não recebe uma data presumida; ano e semestre identificam o período, não determinam seu prazo.
+%% Acrescentar somente PeriodoAcademico como entidade; reutilizar as demais classes, sem criar Professor ou um prazo independente por turma.
+%% A adequação do código, dos tipos, dos cenários e da matriz de cobertura ao prazo compartilhado continua pendente.
 
 %% CRIAÇÃO APÓS O PRAZO: em configurarLembretes, se a proposta incluir novo Lembrete
-%% e Class.prazoEncerrado retornar verdadeiro, rejeitar com o motivo Prazo acadêmico encerrado.
+%% e o PeriodoAcademico da turma retornar verdadeiro em prazoEncerrado, rejeitar com o motivo Prazo acadêmico encerrado.
 %% Rejeitar antes de aplicar a proposta; preservar turma, prazo, configuração, lembretes enviados e histórico.
 %% Não criar o novo Lembrete, não solicitar email e não registrar uma tentativa de envio.
 %% Esta regra de criação não define novas restrições para propostas sem novos lembretes.
@@ -266,7 +311,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% BLOQUEIO POR PRAZO NO PROCESSAMENTO: depois de verificar jaFoiEnviado,
 %% NotificacaoService.processar acessa a Class correspondente pelos dados de Classes
 %% e obtém uma vez o instanteAtual consultando o relógio do servidor.
-%% Antes de qualquer tentativa de email, consulta Class.prazoEncerrado(instanteAtual).
+%% Obter o período por Class.obterPeriodoAcademico e consultar PeriodoAcademico.prazoEncerrado(instanteAtual) antes de qualquer tentativa de email.
 %% Se verdadeiro ao processar um reenvio programado, chamar Lembrete.cancelar(Prazo acadêmico encerrado) e encerrar.
 %% O estado passa para Cancelado, o motivo é guardado e proximoReenvioEm fica vazio; não solicitar email ou registrar tentativa.
 %% Preservar id, data, horário, configuração, turma, prazo e todas as Notificacoes anteriores; não marcar como Enviado.
@@ -309,7 +354,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Não contabilizar o lembrete ignorado como Enviado nem alterar notas ou matrículas.
 %% NotificacaoService registra esse processamento por HistoricoNotificacoes.registrar(Notificacao).
 %% Reaproveitar resultado Ignorado, motivo Nenhuma nota pendente, descricaoFalha vazia e pendenciasRegistradas vazia.
-%% A Notificacao recebe id próprio e dataHora do processamento, preservando o contexto e o prazo da mesma turma.
+%% A Notificacao recebe id próprio e dataHora do processamento, preservando o contexto e o prazo do período da mesma turma.
 %% ignorar altera o Lembrete; registrar preserva o resultado histórico sem criar uma tentativa de email.
 %% Quando se trata de um reenvio pendente após falhas, aplicar cancelar em vez de ignorar, conforme a regra abaixo.
 %% Os estados Não enviado e Agendado continuam sem unificação.
@@ -379,7 +424,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Validar antes de alterar: rejeições preservam data, horário e estado anteriores.
 %% Reagendar não modifica outros lembretes, outra turma nem notificações históricas.
 %% instanteAtual é recebido do serviço, que consulta o relógio do servidor.
-%% prazoAcademico é obtido da Class à qual a configuração pertence.
+%% prazoAcademico é obtido do PeriodoAcademico acessível pela Class à qual a configuração pertence.
 
 %% REMOÇÃO: remove(Lembrete) retira da configuração o lembrete indicado, pertencente a ela.
 %% Lembretes Enviados são preservados; uma remoção rejeitada mantém a configuração intacta.
@@ -392,9 +437,9 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Classes.buscar(turma) localiza a Class indicada; Class.obterConfiguracaoLembretes devolve sua configuração associada.
 %% ConfiguracaoLembretes.listar retorna todos os seus lembretes, com id, data, horário e estado, incluindo os Enviados.
 %% Usar as relações existentes Services --> Classes, Classes *--> Class, Class --> ConfiguracaoLembretes
-%% e ConfiguracaoLembretes *--> Lembrete; não acrescentar novas relações.
-%% Services devolve os lembretes, o prazoAcademico da mesma Class e a quantidade calculada pelo total da lista.
-%% Uma configuração sem lembretes devolve lista vazia e quantidade zero, mantendo o prazo da turma.
+%% e ConfiguracaoLembretes *--> Lembrete; para o prazo, usar Class --> PeriodoAcademico.
+%% Services devolve os lembretes, o prazoAcademico do período da Class e a quantidade calculada pelo total da lista.
+%% Uma configuração sem lembretes devolve lista vazia e quantidade zero, mantendo o prazo compartilhado do período.
 %% A consulta preserva as configurações de todas as turmas, os lembretes e o histórico; não cria ou altera registros.
 %% Consultar não aplica atualizar, add, remove ou reagendar; não consulta o relógio, envia email ou processa lembretes.
 %% A leitura permite apresentar a configuração antes de editar e consultar o estado salvo após aceitação ou rejeição.
@@ -412,12 +457,12 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Services.configurarLembretes(turma, quantidade, lembretesPropostos) continua sendo a entrada conceitual da aplicação.
 %% O serviço consulta o relógio do servidor uma vez por atualização e fornece instanteAtual.
 %% instanteAtual não é informado pelo professor nem armazenado como atributo da configuração.
-%% O prazo é obtido da mesma Class; a gravação integral em armazenamento continua pendente.
+%% O prazo é obtido do período da mesma Class; a gravação integral em armazenamento continua pendente.
 
 %% CONTRATO DE SALVAMENTO: Services recebe a turma selecionada, a quantidade e a proposta do conjunto final.
 %% Localizar a Class por Classes.buscar(turma) e obter sua configuração por obterConfiguracaoLembretes().
-%% O serviço fornece o instante obtido do relógio e o prazoAcademico da mesma Class a atualizar.
-%% Usar as associações existentes com Classes, Class, ConfiguracaoLembretes e Lembrete.
+%% O serviço fornece o instante obtido do relógio e o prazoAcademico do período da mesma Class a atualizar.
+%% Usar as associações existentes com Classes, Class, PeriodoAcademico, ConfiguracaoLembretes e Lembrete.
 %% O retorno String contém a confirmação ou o motivo da rejeição previsto no cenário.
 %% Após aceitar a proposta completa, retornar Configuração salva com sucesso.
 %% Quantidade incompatível ou agendamento obrigatório sem data/horário: Selecione exatamente N datas e horários,
@@ -429,7 +474,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Qualquer rejeição preserva toda a configuração anterior, os ids e estados dos lembretes, o prazo e o histórico.
 %% O sucesso preserva as outras turmas, os lembretes Enviados e o histórico, conforme as regras de atualizar.
 %% Salvar não solicita email nem processa lembretes; a consulta existente permite apresentar o estado salvo.
-%% Não acrescentar entidades, atributos ou relações nem modificar métodos do cliente, EmailService ou Interface.
+%% Este fluxo reutiliza as entidades e relações já representadas; preservar os demais métodos do cliente, EmailService e Interface.
 
 %% Nesta feature, Notificacao registra o resultado de um processamento, com ou sem tentativa de envio.
 %% resultado é Enviado, Falha ou Ignorado; somente Enviado e Falha representam tentativas de email.
@@ -455,14 +500,14 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Cada novo registro preserva sua própria lista; em Ignorado a lista é vazia, sem modificar os registros anteriores.
 %% HistoricoNotificacoes.registrar preserva essa lista junto dos demais dados da Notificacao.
 %% A relação com Lembrete continua representando a origem; as pendências históricas pertencem ao registro.
-%% PRAZO REGISTRADO: Class.prazoAcademico continua sendo o prazo oficial utilizado nas regras da turma.
-%% NotificacaoService obtém o prazo da mesma Class pelo acesso existente a Classes e o copia para prazoRegistrado
+%% PRAZO REGISTRADO: PeriodoAcademico.prazoAcademico é a fonte oficial compartilhada pelas turmas do mesmo ano e semestre.
+%% NotificacaoService acessa Classes, a Class correspondente e Class.obterPeriodoAcademico e copia o prazo para prazoRegistrado
 %% ao compor a Notificacao daquele processamento, registrada por HistoricoNotificacoes.registrar.
-%% prazoRegistrado preserva o prazo acadêmico da turma naquele momento, informado no aviso quando houver envio.
+%% prazoRegistrado preserva o prazo acadêmico do período naquele momento, informado no aviso quando houver envio.
 %% dataHora registra o processamento ou tentativa, como 25/08/2026 às 09:00; não é o prazo acadêmico.
 %% Registrar outro processamento preserva o prazo e os demais dados das notificações anteriores.
 %% Services.consultarDetalhesNotificacao devolve o prazo registrado pela consulta existente buscar(idNotificacao).
-%% Os métodos, as relações, as demais classes e o prazo oficial em Class permanecem inalterados.
+%% A consulta histórica preserva os registros e não recalcula prazos a partir do valor atual de PeriodoAcademico.
 %% LISTAGEM DO HISTÓRICO: nesta funcionalidade há um único professor, com suas turmas disponíveis.
 %% HistoricoNotificacoes.listar retorna as Notificacoes registradas, com resultados Enviado, Falha e Ignorado.
 %% Consultas de tentativas de envio consideram somente resultados Enviado e Falha, sem incluir Ignorado na contagem ou na última tentativa.

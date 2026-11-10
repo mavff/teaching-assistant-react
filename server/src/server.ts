@@ -6,6 +6,7 @@ import { Evaluation } from './models/Evaluation';
 import { Classes } from './models/Classes';
 import { Class } from './models/Class';
 import { Report } from './models/Report';
+import { PeriodoAcademico } from './models/PeriodoAcademico';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EspecificacaoDoCalculoDaMedia, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from './models/EspecificacaoDoCalculoDaMedia';
@@ -26,6 +27,7 @@ app.use(express.json());
 // In-memory storage with file persistence
 const studentSet = new StudentSet();
 const classes = new Classes();
+const periodosAcademicos = new Map<string, PeriodoAcademico>(); // Mantém um período por identificação, como 2026.2, mesmo sem turmas cadastradas.
 const dataFile = path.resolve('./data/app-data.json');
 
 // Persistence functions
@@ -36,9 +38,16 @@ const ensureDataDirectory = (): void => {
   }
 };
 
-const saveDataToFile = (): void => {
+const saveDataToFile = (
+  periodosParaSalvar: ReadonlyMap<string, PeriodoAcademico> = periodosAcademicos
+): boolean => { // Permite gravar uma proposta sem alterar os períodos atuais e informa se a escrita foi concluída.
   try {
     const data = {
+      periodosAcademicos: Array.from(periodosParaSalvar.values()).map(periodo => ({
+        ano: periodo.getAno(),
+        semestre: periodo.getSemestre(),
+        prazoAcademico: periodo.getPrazoAcademico()?.toISOString() ?? null // Grava o instante em ISO ou indica ausência de prazo.
+      })),
       students: studentSet.getAllStudents().map(student => ({
         name: student.name,
         cpf: student.getCPF(),
@@ -48,6 +57,7 @@ const saveDataToFile = (): void => {
         topic: classObj.getTopic(),
         semester: classObj.getSemester(),
         year: classObj.getYear(),
+        prazoAcademico: classObj.getPrazoAcademico()?.toISOString() ?? null, // Inclui o prazo no JSON persistido junto dos dados da turma.
         especificacaoDoCalculoDaMedia: classObj.getEspecificacaoDoCalculoDaMedia().toJSON(),
         enrollments: classObj.getEnrollments().map(enrollment => ({
           studentCPF: enrollment.getStudent().getCPF(),
@@ -57,9 +67,13 @@ const saveDataToFile = (): void => {
     };
     
     ensureDataDirectory();
-    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), 'utf8');
+    const arquivoTemporario = `${dataFile}.tmp-${process.pid}`;
+    fs.writeFileSync(arquivoTemporario, JSON.stringify(data, null, 2), 'utf8'); // Prepara o conteúdo completo sem substituir o arquivo atual.
+    fs.renameSync(arquivoTemporario, dataFile); // Substitui o arquivo somente após concluir a escrita.
+    return true;
   } catch (error) {
     console.error('Error saving students to file:', error);
+    return false; // A nova rota usa esse retorno para rejeitar a alteração sem modificar o período em memória.
   }
 };
 
@@ -69,6 +83,18 @@ const loadDataFromFile = (): void => {
     if (fs.existsSync(dataFile)) {
       const fileContent = fs.readFileSync(dataFile, 'utf-8');
       const data = JSON.parse(fileContent);
+
+      if (Array.isArray(data.periodosAcademicos)) { // Arquivos antigos continuam sendo lidos quando esse campo não existe.
+        for (const registro of data.periodosAcademicos) {
+          const periodo = new PeriodoAcademico(
+            registro.ano,
+            registro.semestre,
+            registro.prazoAcademico == null ? null : new Date(registro.prazoAcademico) // Recupera também prazos históricos, sem tratá-los como novos cadastros.
+          );
+
+          periodosAcademicos.set(periodo.getIdentificador(), periodo); // Permite localizar o mesmo período pelo ano e semestre.
+        }
+      }
       
       // Load students
       if (data.students && Array.isArray(data.students)) {
@@ -93,6 +119,11 @@ const loadDataFromFile = (): void => {
         data.classes.forEach((classData: any) => {
           try {
             const classObj = new Class(classData.topic, classData.semester, classData.year, EspecificacaoDoCalculoDaMedia.fromJSON(classData.especificacaoDoCalculoDaMedia));
+
+            if (classData.prazoAcademico !== undefined && classData.prazoAcademico !== null) {
+              classObj.setPrazoAcademico(new Date(classData.prazoAcademico)); // Restaura o prazo usando a validação da entidade.
+            }
+
             classes.addClass(classObj);
 
             // Load enrollments for this class
@@ -159,6 +190,70 @@ const cleanCPF = (cpf: string): string => {
 };
 
 // Routes
+
+app.get('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response) => {
+  try {
+    const identidade = new PeriodoAcademico(Number(req.params.ano), Number(req.params.semestre)); // Valida ano e semestre sem cadastrar um período.
+    const periodo = periodosAcademicos.get(identidade.getIdentificador());
+
+    if (!periodo) {
+      return res.status(404).json({ error: 'Período acadêmico não cadastrado' });
+    }
+
+    res.json({
+      ano: periodo.getAno(),
+      semestre: periodo.getSemestre(),
+      prazoAcademico: periodo.getPrazoAcademico()?.toISOString() ?? null
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response) => {
+  try {
+    const ano = Number(req.params.ano);
+    const semestre = Number(req.params.semestre);
+    const prazoInformado = req.body?.prazoAcademico;
+
+    if (typeof prazoInformado !== 'string') {
+      return res.status(400).json({ error: 'Prazo acadêmico inválido' });
+    }
+
+    const candidato = new PeriodoAcademico(ano, semestre); // Prepara a alteração sem modificar o período atual.
+    const identificador = candidato.getIdentificador();
+    const anterior = periodosAcademicos.get(identificador);
+    const novoPrazo = new Date(prazoInformado);
+    const instanteAtual = new Date(); // O servidor fornece um único instante para toda a operação.
+
+    const configuracoes = classes.getAllClasses()
+      .filter(turma => turma.getYear() === ano && turma.getSemester() === semestre)
+      .map(turma => turma.obterConfiguracaoLembretes()); // Confere os lembretes de todas as turmas afetadas pelo prazo.
+
+    candidato.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoes); // Reutiliza as regras de datas e conflitos do domínio.
+
+    const propostaDeGravacao = new Map(periodosAcademicos);
+    propostaDeGravacao.set(identificador, candidato); // Prepara os dados que serão gravados, preservando o estado atual.
+
+    if (!isTestMode && !saveDataToFile(propostaDeGravacao)) {
+      return res.status(500).json({ error: 'Não foi possível salvar o prazo acadêmico' });
+    }
+
+    if (anterior) {
+      anterior.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoes); // Atualiza o objeto compartilhado após a gravação.
+    } else {
+      periodosAcademicos.set(identificador, candidato); // Disponibiliza o novo período após a gravação.
+    }
+
+    res.json({
+      ano,
+      semestre,
+      prazoAcademico: candidato.getPrazoAcademico()?.toISOString() ?? null
+    });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
 
 // GET /api/students - Get all students
 app.get('/api/students', (req: Request, res: Response) => {
@@ -295,14 +390,23 @@ app.get('/api/classes', (req: Request, res: Response) => {
 // POST /api/classes - Add a new class
 app.post('/api/classes', (req: Request, res: Response) => {
   try {
-    const { topic, semester, year } = req.body;
+    const { topic, semester, year, prazoAcademico } = req.body; // Obtém os dados da turma e o prazo informado pelo professor.
     
     if (!topic || !semester || !year) {
       return res.status(400).json({ error: 'Topic, semester, and year are required' });
     }
 
     const classObj = new Class(topic, semester, year, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
-    const newClass = classes.addClass(classObj);
+
+    if (prazoAcademico !== undefined) { // Mantém a compatibilidade com chamadas antigas que não enviavam prazo.
+      if (typeof prazoAcademico !== 'string') { // Verifica o formato recebido pelo HTTP antes de convertê-lo em Date.
+        return res.status(400).json({ error: 'Prazo acadêmico inválido' });
+      }
+
+      classObj.setPrazoAcademico(new Date(prazoAcademico)); // Converte o texto e delega a validação da data à entidade Class.
+    }
+
+    const newClass = classes.addClass(classObj); // Registra a turma somente após validar os dados fornecidos.
     triggerSave(); // Save to file after adding class
     res.status(201).json(newClass.toJSON());
   } catch (error) {
@@ -314,7 +418,7 @@ app.post('/api/classes', (req: Request, res: Response) => {
 app.put('/api/classes/:id', (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { topic, semester, year } = req.body;
+    const { topic, semester, year, prazoAcademico } = req.body; // Recebe os dados da turma e, quando informado, o novo prazo.
     
     if (!topic || !semester || !year) {
       return res.status(400).json({ error: 'Topic, semester, and year are required' });
@@ -323,6 +427,14 @@ app.put('/api/classes/:id', (req: Request, res: Response) => {
     const existingClass = classes.findClassById(id);
     if (!existingClass) {
       return res.status(404).json({ error: 'Class not found' });
+    }
+
+    if (prazoAcademico !== undefined) { // Altera o prazo somente quando o campo é enviado; a omissão preserva o valor anterior.
+      if (typeof prazoAcademico !== 'string') { // Rejeita valores que não podem representar a data no formato recebido pela API.
+        return res.status(400).json({ error: 'Prazo acadêmico inválido' });
+      }
+
+      existingClass.setPrazoAcademico(new Date(prazoAcademico)); // Delega à entidade a validação e a atualização do prazo.
     }
 
     // Update the class directly using setters
@@ -518,7 +630,7 @@ app.get('/api/classes/:classId/report', (req: Request, res: Response) => {
 
 
 // Export the app for testing
-export { app, studentSet, classes };
+export { app, studentSet, classes, periodosAcademicos };
 
 // Only start the server if this file is run directly (not imported for testing)
 if (require.main === module) {

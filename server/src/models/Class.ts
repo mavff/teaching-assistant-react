@@ -1,6 +1,7 @@
 import { Student } from './Student';
 import { Enrollment } from './Enrollment';
 import { EspecificacaoDoCalculoDaMedia } from './EspecificacaoDoCalculoDaMedia';
+import { ConfiguracaoLembretes } from './ConfiguracaoLembretes';
 
 export class Class {
   private topic: string;
@@ -8,6 +9,8 @@ export class Class {
   private year: number;
   private readonly especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia;
   private enrollments: Enrollment[];
+  private prazoAcademico: Date | null = null; // Turmas existentes começam sem prazo; nenhum prazo é presumido.
+  private readonly configuracaoLembretes = new ConfiguracaoLembretes(); // Cria uma configuração exclusiva da turma; readonly impede substituir essa referência.
 
   constructor(topic: string, semester: number, year: number, especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia, enrollments: Enrollment[] = []) {
     this.topic = topic;
@@ -28,6 +31,16 @@ export class Class {
 
   getYear(): number {
     return this.year;
+  }
+
+  obterConfiguracaoLembretes(): ConfiguracaoLembretes {
+    return this.configuracaoLembretes; // Permite acessar os lembretes da turma pelas operações da configuração.
+  }
+
+  getPrazoAcademico(): Date | null { // Permite consultar o prazo sem expor o objeto interno à alteração.
+    return this.prazoAcademico
+      ? new Date(this.prazoAcademico.getTime())
+      : null; // Retorna uma cópia da data ou indica que o prazo ainda não foi cadastrado.
   }
 
   getEnrollments(): Enrollment[] {
@@ -52,8 +65,28 @@ export class Class {
     this.year = year;
   }
 
+  setPrazoAcademico(prazoAcademico: Date): void { // Define ou altera o prazo da turma.
+    if (!Number.isFinite(prazoAcademico.getTime())) { // Uma data inválida produz um horário numérico inválido.
+      throw new Error('Prazo acadêmico inválido');
+    }
+
+    this.prazoAcademico = new Date(prazoAcademico.getTime()); // Guarda uma cópia para impedir alterações externas à data recebida.
+  }
+
   getEspecificacaoDoCalculoDaMedia(): EspecificacaoDoCalculoDaMedia {
     return this.especificacaoDoCalculoDaMedia;
+  }
+
+  prazoEncerrado(instanteAtual: Date): boolean { // Implementa a consulta prevista no DDD usando o instante fornecido pelo serviço.
+    if (this.prazoAcademico === null) {
+      throw new Error('Prazo acadêmico não definido para a turma'); // Exige um prazo conhecido para avaliar seu encerramento.
+    }
+
+    if (!Number.isFinite(instanteAtual.getTime())) {
+      throw new Error('Instante atual inválido'); // Impede uma comparação que produziria um resultado incorreto.
+    }
+
+    return instanteAtual.getTime() > this.prazoAcademico.getTime(); // Exatamente no prazo ainda é permitido; somente depois dele está encerrado.
   }
 
   // Enrollment management
@@ -100,13 +133,21 @@ export class Class {
       topic: this.topic,
       semester: this.semester,
       year: this.year,
+      prazoAcademico: this.prazoAcademico?.toISOString() ?? null, // Converte a data para texto ISO; mantém null quando não existe prazo.
       especificacaoDoCalculoDaMedia: this.especificacaoDoCalculoDaMedia.toJSON(),
       enrollments: this.enrollments.map(enrollment => enrollment.toJSON())
     };
   }
 
   // Create Class from JSON object
-  static fromJSON(data: { topic: string; semester: number; year: number; especificacaoDoCalculoDaMedia: any, enrollments: any[] }, allStudents: Student[]): Class {
+  static fromJSON(data: {
+    topic: string;
+    semester: number;
+    year: number;
+    especificacaoDoCalculoDaMedia: any;
+    enrollments: any[];
+    prazoAcademico?: string | null; // O campo pode estar ausente em dados antigos ou ser null em turmas sem prazo.
+  }, allStudents: Student[]): Class {
     const enrollments = data.enrollments
       ? data.enrollments.map((enrollmentData: any) => {
           const student = allStudents.find(s => s.getCPF() === enrollmentData.student.cpf);
@@ -120,6 +161,12 @@ export class Class {
     // Novo carregamento do EspecificacaoDoCalculoDaMedia
     const especificacaoDoCalculoDaMedia = EspecificacaoDoCalculoDaMedia.fromJSON(data.especificacaoDoCalculoDaMedia);
 
-    return new Class(data.topic, data.semester, data.year, especificacaoDoCalculoDaMedia, enrollments);
+    const classObj = new Class(data.topic, data.semester, data.year, especificacaoDoCalculoDaMedia, enrollments); // Reconstrói os dados existentes da turma.
+
+    if (data.prazoAcademico !== undefined && data.prazoAcademico !== null) {
+      classObj.setPrazoAcademico(new Date(data.prazoAcademico)); // Converte o texto em Date e reutiliza a validação da entidade.
+    }
+
+    return classObj; // Retorna a turma com o prazo recuperado, quando informado.
   }
 }
