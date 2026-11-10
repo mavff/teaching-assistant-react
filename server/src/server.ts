@@ -6,6 +6,7 @@ import { Evaluation } from './models/Evaluation';
 import { Classes } from './models/Classes';
 import { Class } from './models/Class';
 import { Report } from './models/Report';
+import { PeriodoAcademico } from './models/PeriodoAcademico';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EspecificacaoDoCalculoDaMedia, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from './models/EspecificacaoDoCalculoDaMedia';
@@ -26,6 +27,7 @@ app.use(express.json());
 // In-memory storage with file persistence
 const studentSet = new StudentSet();
 const classes = new Classes();
+const periodosAcademicos = new Map<string, PeriodoAcademico>(); // Mantém um período por identificação, como 2026.2, mesmo sem turmas cadastradas.
 const dataFile = path.resolve('./data/app-data.json');
 
 // Persistence functions
@@ -39,6 +41,11 @@ const ensureDataDirectory = (): void => {
 const saveDataToFile = (): void => {
   try {
     const data = {
+      periodosAcademicos: Array.from(periodosAcademicos.values()).map(periodo => ({
+        ano: periodo.getAno(),
+        semestre: periodo.getSemestre(),
+        prazoAcademico: periodo.getPrazoAcademico()?.toISOString() ?? null // Grava o instante em ISO ou indica ausência de prazo.
+      })),
       students: studentSet.getAllStudents().map(student => ({
         name: student.name,
         cpf: student.getCPF(),
@@ -70,6 +77,18 @@ const loadDataFromFile = (): void => {
     if (fs.existsSync(dataFile)) {
       const fileContent = fs.readFileSync(dataFile, 'utf-8');
       const data = JSON.parse(fileContent);
+
+      if (Array.isArray(data.periodosAcademicos)) { // Arquivos antigos continuam sendo lidos quando esse campo não existe.
+        for (const registro of data.periodosAcademicos) {
+          const periodo = new PeriodoAcademico(
+            registro.ano,
+            registro.semestre,
+            registro.prazoAcademico == null ? null : new Date(registro.prazoAcademico) // Recupera também prazos históricos, sem tratá-los como novos cadastros.
+          );
+
+          periodosAcademicos.set(periodo.getIdentificador(), periodo); // Permite localizar o mesmo período pelo ano e semestre.
+        }
+      }
       
       // Load students
       if (data.students && Array.isArray(data.students)) {
