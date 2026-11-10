@@ -215,23 +215,28 @@ A adequação altera somente a precondição inicial dos 11 GUI que ainda exigia
 autenticação; os demais dados, ações e resultados são preservados. Não modifica
 o modelo, o PNG ou os cenários de serviço.
 
-### Prazo acadêmico da turma e rejeição de criação
+### Prazo acadêmico do período e rejeição de criação
 
-`Class` representa `prazoAcademico`, utilizado pela configuração dos lembretes
-daquela turma. Ano e semestre não substituem essa informação. O servidor já possui
-o atributo, a consulta de encerramento, a conversão JSON e o recebimento do prazo
-nas rotas de turmas. A entrada pelo formulário e a integração das novas regras
-de definição do prazo, descritas abaixo, continuam pendentes.
+`PeriodoAcademico` é identificado por ano e semestre e possui `prazoAcademico`.
+Todas as turmas do mesmo período consultam essa única fonte de prazo por
+`Class.obterPeriodoAcademico()`. Por exemplo, as turmas de ESS e Introdução à
+Programação de 2026.2 compartilham o prazo, enquanto 2027.1 é outro período.
+Os identificadores de ano e semestre não determinam uma data padrão.
 
-`Class.prazoEncerrado(instanteAtual)` retorna verdadeiro somente quando o instante
-recebido é posterior ao prazo. A consulta não modifica dados, consulta o relógio
+`Class` mantém sua configuração e seus lembretes, mas não possui nem edita um
+prazo independente. A implementação atual do servidor, suas rotas e os tipos do
+cliente ainda seguem a versão anterior, com prazo por turma; serão adequados em
+incrementos posteriores. Este incremento altera somente o modelo e o guia.
+
+`PeriodoAcademico.prazoEncerrado(instanteAtual)` retorna verdadeiro somente quando
+o instante recebido é posterior ao prazo. A consulta não modifica dados, consulta o relógio
 ou envia email. A igualdade com o prazo retorna falso; as demais validações da
 configuração continuam necessárias.
 
 `Services.configurarLembretes(turma, quantidade, lembretesPropostos)` acessa a turma
-por `Classes` e consulta o relógio
-do servidor uma vez. O prazo da mesma `Class` e o instante obtido são fornecidos
-às operações de configuração e reagendamento. O professor não informa o instante
+por `Classes` e obtém seu período por `Class.obterPeriodoAcademico()`. O serviço
+consulta o relógio do servidor uma vez. O prazo compartilhado desse período e o
+instante obtido são fornecidos às operações de configuração e reagendamento. O professor não informa o instante
 atual. O cadastro e a edição do prazo seguem a operação descrita na próxima seção.
 
 Se a proposta incluir um novo lembrete e o prazo já estiver encerrado, o serviço
@@ -250,53 +255,68 @@ O último percurso representa a regra central do cenário service **Bloqueio de
 criação de novo lembrete após o prazo acadêmico**. O bloqueio durante o processamento
 é detalhado a seguir, incluindo o cancelamento dos reenvios após o prazo.
 
-### Definição e edição do prazo acadêmico
+### Definição e edição do prazo por período
 
-O professor informa o prazo da turma, sem uma data fixa presumida pelo sistema.
-`Services.definirPrazoAcademico(turma, novoPrazo)` obtém a `Class` em criação no
-cadastro ou a localiza por `Classes.buscar(turma)` na edição. O serviço consulta
-uma vez o relógio do servidor e chama
-`Class.definirPrazoAcademico(novoPrazo, instanteAtual)`. O instante atual não é
-fornecido pelo cliente nem guardado na turma.
+O professor cadastra o prazo uma única vez para um ano e semestre, fora do
+cadastro individual de turmas. O período pode ser configurado mesmo quando ainda
+não possui turmas. Não são criados períodos independentes com a mesma identidade
+para cada disciplina; ano e semestre identificam uma única fonte compartilhada.
 
-A turma rejeita uma data inválida com **Prazo acadêmico inválido**. Se o novo prazo
+`Services.definirPrazoAcademico(ano, semestre, novoPrazo)` obtém o período
+correspondente. `Classes.buscarPorPeriodo(ano, semestre)` retorna todas e somente
+as turmas desse período, sem modificar dados. O serviço obtém a configuração de
+cada uma e consulta uma vez o relógio do servidor antes de chamar
+`PeriodoAcademico.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoesDoPeriodo)`.
+O conjunto de configurações é obtido no servidor, não enviado pelo cliente; uma
+turma aberta na interface não limita as turmas que precisam ser verificadas.
+
+O período rejeita uma data inválida com **Prazo acadêmico inválido**. Se o novo prazo
 for anterior ao instante atual, rejeita com **Prazo acadêmico não pode ser anterior
 à data atual**. A igualdade com o instante atual é permitida, desde que a
-configuração existente também seja compatível.
+configuração de todas as suas turmas também seja compatível.
 
-Antes de alterar o atributo, `Class` consulta sua configuração por
-`ConfiguracaoLembretes.possuiAgendamentosPendentesApos(novoPrazo)`. A consulta
+Antes de alterar o atributo, `PeriodoAcademico` consulta cada configuração por
+`ConfiguracaoLembretes.possuiAgendamentosPendentesApos(novoPrazo)`. Cada consulta
 retorna verdadeiro se um lembrete em Não enviado ou Agendado possuir agendamento
 original posterior ao novo prazo ou `proximoReenvioEm` preenchido e posterior a
 ele. Os estados Não enviado e Agendado continuam distintos. Lembretes Enviados,
 Ignorados e Cancelados não bloqueiam a alteração.
 
-Uma incompatibilidade rejeita toda a alteração com **Prazo acadêmico incompatível
-com lembretes pendentes**. A validação precede qualquer mudança, preservando a
-turma, o prazo anterior, os identificadores, os estados, os agendamentos, os
-reenvios e o histórico. Não há cancelamento, remoção ou reagendamento automático.
-Se aceita, a operação altera somente o prazo daquela turma; as outras turmas e
-`Notificacao.prazoRegistrado` permanecem inalterados.
+Uma incompatibilidade em qualquer turma do período rejeita toda a alteração com
+**Prazo acadêmico incompatível com lembretes pendentes**. A validação precede
+qualquer mudança, preservando o prazo anterior, todas as turmas, os identificadores,
+os estados, os agendamentos, os reenvios e o histórico. Não há cancelamento,
+remoção ou reagendamento automático. Se aceita, a operação altera somente o
+prazo do período; todas as turmas associadas passam a consultar o novo valor,
+sem receber cópias editáveis. Os demais períodos e `Notificacao.prazoRegistrado`
+permanecem inalterados.
 
 | Situação | Resultado esperado |
 | --- | --- |
-| Novo prazo anterior ao instante atual | Rejeitar e preservar o prazo anterior. |
-| Novo prazo igual ao instante atual, sem agendamentos pendentes posteriores | Aceitar. |
-| Lembrete pendente ou reenvio programado depois do novo prazo | Rejeitar e preservar todos os lembretes. |
+| Novo prazo anterior ao instante atual | Rejeitar e preservar o prazo anterior de todo o período. |
+| Novo prazo igual ao instante atual, sem agendamentos pendentes posteriores em nenhuma turma do período | Aceitar. |
+| Lembrete pendente ou reenvio programado depois do novo prazo em qualquer turma do período | Rejeitar e preservar o prazo e todos os lembretes. |
 | Lembrete pendente ou reenvio exatamente no novo prazo | Não bloqueia a alteração; as demais validações continuam necessárias. |
 | Somente registros Enviados, Ignorados ou Cancelados depois do novo prazo | Não bloqueiam a alteração; os registros são preservados. |
-| Recuperação de uma turma histórica com prazo passado | Restaurar o prazo sem tratá-lo como um novo cadastro ou edição. |
+| Prazo de 2026.2 alterado com sucesso | Todas as suas turmas consultam o novo prazo; 2025.2 e 2027.1 permanecem inalterados. |
+| Período sem turmas | A lista de configurações é vazia; validar a data sem presumir incompatibilidades. |
+| Recuperação de um período histórico com prazo passado | Restaurar o prazo sem tratá-lo como um novo cadastro ou edição. |
 
-Turmas antigas sem prazo continuam sem prazo, sem inferir datas pelo semestre.
+Um período sem prazo cadastrado continua sem prazo, sem inferir datas pelo semestre.
 As datas dos cenários são exemplos controlados, não valores padrão da aplicação.
 A consulta de compatibilidade preserva a configuração e o histórico, não consulta
-o relógio e não envia email. São reutilizadas as classes e relações existentes.
+o relógio e não envia email. Somente `PeriodoAcademico` é acrescentado como entidade;
+`Classes` mantém a responsabilidade de localizar turmas, e `ConfiguracaoLembretes`
+mantém a consulta dos seus próprios lembretes. `Services` coordena a operação,
+sem armazenar uma cópia do prazo em cada turma.
 
-Este incremento registra decisões de domínio aprovadas. Os cenários que utilizam
-o prazo partem de um valor conhecido. Os 25 cenários atuais não são alterados nem
-considerados cobertura dos novos fluxos de cadastro e edição. Os testes unitários
-existentes de prazo e JSON também não demonstram essas novas regras completas.
-A adequação do servidor, o formulário e novos cenários específicos continuam pendentes.
+Este incremento registra decisões de domínio aprovadas. Os 25 cenários atuais,
+seus comentários e a matriz de cobertura ainda precisam ser adequados ao prazo
+compartilhado; não são alterados nem considerados evidência dessa nova regra.
+Os testes unitários existentes de `Class` e JSON verificam a implementação
+anterior, não o compartilhamento por período nem sua validação entre turmas.
+A adequação do código, dos tipos, da persistência, dos cenários e da GUI será
+apresentada em incrementos posteriores. Os commits anteriores permanecem no histórico.
 
 ### Bloqueio por prazo antes de cada tentativa
 
@@ -307,7 +327,8 @@ primeira tentativa quanto nos reenvios que passam por essa operação:
 2. Se o lembrete já estiver Cancelado, encerrar preservando estado, motivo e histórico.
 3. Acessar a turma correspondente por `Classes` e obter uma vez o instante atual
    consultando o relógio do servidor.
-4. Antes de solicitar email, consultar `Class.prazoEncerrado(instanteAtual)`.
+4. Obter o período da turma e, antes de solicitar email, consultar
+   `PeriodoAcademico.prazoEncerrado(instanteAtual)`.
 5. Se verdadeiro em um reenvio programado, chamar `cancelar` com
    **Prazo acadêmico encerrado** e encerrar sem email ou nova tentativa.
    Na primeira tentativa sem reenvio, manter o bloqueio sem alterar o lembrete.
@@ -428,8 +449,9 @@ precisará ser implementada e garantida na gravação em armazenamento.
 O método `Services.configurarLembretes(turma, quantidade, lembretesPropostos)`
 recebe a turma selecionada, a quantidade e os dados do conjunto final pretendido.
 A turma é localizada por `Classes.buscar(turma)` e sua configuração é obtida por
-`Class.obterConfiguracaoLembretes()`. O serviço fornece o instante obtido do
-relógio e o prazo da mesma turma para coordenar `atualizar`.
+`Class.obterConfiguracaoLembretes()`. O serviço obtém seu período por
+`Class.obterPeriodoAcademico()` e fornece o instante do relógio e o prazo
+compartilhado desse período para coordenar `atualizar`.
 
 O retorno `String`, visível na assinatura do método, contém a confirmação ou
 o motivo da rejeição descrito pelos cenários:
@@ -466,8 +488,8 @@ Exemplos para percorrer conceitualmente:
 
 Esses exemplos cobrem regras de domínio presentes em cenários GUI. Não comprovam
 navegação, mensagens, persistência ou testes executáveis aprovados. Autenticação e
-RBAC não fazem parte do escopo acordado. O prazo pertence a `Class`; o contrato
-concreto do relógio, os estados ainda indefinidos, o envio das notificações, o
+RBAC não fazem parte do escopo acordado. O prazo pertence a `PeriodoAcademico`;
+o contrato concreto do relógio, os estados ainda indefinidos, o envio das notificações, o
 processamento automático e a concorrência continuam pendentes.
 
 ### Responsabilidades na identificação das notas pendentes
@@ -760,13 +782,13 @@ descrito a seguir.
 
 ### Prazo acadêmico registrado na notificação
 
-`Class.prazoAcademico` permanece como prazo oficial da turma, utilizado para
-validar agendamentos e o processamento dos lembretes. `Notificacao.prazoRegistrado`
-preserva o prazo acadêmico da turma naquele processamento, informado no aviso
-quando há envio.
+`PeriodoAcademico.prazoAcademico` é a fonte oficial compartilhada pelas turmas do
+mesmo ano e semestre, utilizada para validar agendamentos e o processamento dos
+lembretes. `Notificacao.prazoRegistrado` preserva o prazo do período naquele
+processamento, informado no aviso quando há envio.
 
-`NotificacaoService` obtém o prazo da mesma turma pelo acesso existente a `Classes`
-e o copia ao compor a notificação que será registrada por
+`NotificacaoService` acessa `Classes`, a turma correspondente e seu período por
+`Class.obterPeriodoAcademico()`. Copia o prazo ao compor a notificação registrada por
 `HistoricoNotificacoes.registrar(Notificacao)`. O registro mantém esse valor
 junto dos demais dados da tentativa; novos registros preservam os anteriores.
 
@@ -775,8 +797,9 @@ enquanto `prazoRegistrado` corresponde a 31/08/2026 às 23:59, a data limite par
 cadastrar notas informada no aviso.
 
 `Services.consultarDetalhesNotificacao(idNotificacao)` usa a busca existente no
-histórico e devolve também `prazoRegistrado`. O único acréscimo no desenho é esse
-atributo em `Notificacao`; métodos, relações e demais classes são preservados.
+histórico e devolve também `prazoRegistrado`. A transferência do prazo oficial
+para o período não exige recalcular esse valor histórico nem alterar a operação
+de consulta dos detalhes.
 
 ### Bloqueio de reprocessamento de lembrete já enviado
 
