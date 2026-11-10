@@ -8,6 +8,7 @@ export class Class {
   private year: number;
   private readonly especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia;
   private enrollments: Enrollment[];
+  private prazoAcademico: Date | null = null; // Turmas existentes começam sem prazo; nenhum prazo é presumido.
 
   constructor(topic: string, semester: number, year: number, especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia, enrollments: Enrollment[] = []) {
     this.topic = topic;
@@ -28,6 +29,12 @@ export class Class {
 
   getYear(): number {
     return this.year;
+  }
+
+  getPrazoAcademico(): Date | null { // Permite consultar o prazo sem expor o objeto interno à alteração.
+    return this.prazoAcademico
+      ? new Date(this.prazoAcademico.getTime())
+      : null; // Retorna uma cópia da data ou indica que o prazo ainda não foi cadastrado.
   }
 
   getEnrollments(): Enrollment[] {
@@ -52,8 +59,28 @@ export class Class {
     this.year = year;
   }
 
+  setPrazoAcademico(prazoAcademico: Date): void { // Define ou altera o prazo da turma.
+    if (!Number.isFinite(prazoAcademico.getTime())) { // Uma data inválida produz um horário numérico inválido.
+      throw new Error('Prazo acadêmico inválido');
+    }
+
+    this.prazoAcademico = new Date(prazoAcademico.getTime()); // Guarda uma cópia para impedir alterações externas à data recebida.
+  }
+
   getEspecificacaoDoCalculoDaMedia(): EspecificacaoDoCalculoDaMedia {
     return this.especificacaoDoCalculoDaMedia;
+  }
+
+  prazoEncerrado(instanteAtual: Date): boolean { // Implementa a consulta prevista no DDD usando o instante fornecido pelo serviço.
+    if (this.prazoAcademico === null) {
+      throw new Error('Prazo acadêmico não definido para a turma'); // Exige um prazo conhecido para avaliar seu encerramento.
+    }
+
+    if (!Number.isFinite(instanteAtual.getTime())) {
+      throw new Error('Instante atual inválido'); // Impede uma comparação que produziria um resultado incorreto.
+    }
+
+    return instanteAtual.getTime() > this.prazoAcademico.getTime(); // Exatamente no prazo ainda é permitido; somente depois dele está encerrado.
   }
 
   // Enrollment management
