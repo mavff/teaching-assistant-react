@@ -89,3 +89,22 @@ describe('Prazo acadêmico da turma', () => {
     expect(turmaRecuperada.getPrazoAcademico()).toBeNull();
   });
 });
+
+/**
+ * Teste unitário de Class: protege o isolamento das configurações entre turmas.
+ * Apoia o cenário de alteração sem afetar outra turma; não executa GUI, HTTP ou persistência.
+ */
+describe('Configuração de lembretes da turma', () => {
+  test('configura um lembrete em uma turma sem modificar outra do mesmo semestre', () => {
+    const turmaESS = new Class('ESS', 2, 2026, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA); // Turma que receberá o lembrete.
+    const turmaIP = new Class('Introdução a Programação', 2, 2026, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA); // Mesmo período, mas com configuração própria.
+    const instanteAtual = new Date('2026-08-20T08:00:00.000Z'); // Instante fixo para o teste não depender do relógio do computador.
+    const prazo = new Date('2026-08-31T23:59:00.000Z'); // Limite fornecido à validação; este teste ainda não integra o período compartilhado.
+    const configuracao = turmaESS.obterConfiguracaoLembretes(); // Obtém a configuração associada à turma escolhida.
+
+    configuracao.atualizar(1, [{ id: 'primeiro', data: '2026-08-25', horario: '09:00' }], instanteAtual, prazo); // Aplica uma proposta válida pelas regras do domínio.
+
+    expect(turmaESS.obterConfiguracaoLembretes().listar()).toHaveLength(1); // Confirma que a alteração permanece na configuração da turma.
+    expect(turmaIP.obterConfiguracaoLembretes().listar()).toEqual([]); // A outra turma deve continuar sem lembretes.
+  });
+});

@@ -1,6 +1,7 @@
 import { Student } from './Student';
 import { Enrollment } from './Enrollment';
 import { EspecificacaoDoCalculoDaMedia } from './EspecificacaoDoCalculoDaMedia';
+import { ConfiguracaoLembretes } from './ConfiguracaoLembretes';
 
 export class Class {
   private topic: string;
@@ -9,6 +10,7 @@ export class Class {
   private readonly especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia;
   private enrollments: Enrollment[];
   private prazoAcademico: Date | null = null; // Turmas existentes começam sem prazo; nenhum prazo é presumido.
+  private readonly configuracaoLembretes = new ConfiguracaoLembretes(); // Cria uma configuração exclusiva da turma; readonly impede substituir essa referência.
 
   constructor(topic: string, semester: number, year: number, especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia, enrollments: Enrollment[] = []) {
     this.topic = topic;
@@ -29,6 +31,10 @@ export class Class {
 
   getYear(): number {
     return this.year;
+  }
+
+  obterConfiguracaoLembretes(): ConfiguracaoLembretes {
+    return this.configuracaoLembretes; // Permite acessar os lembretes da turma pelas operações da configuração.
   }
 
   getPrazoAcademico(): Date | null { // Permite consultar o prazo sem expor o objeto interno à alteração.
