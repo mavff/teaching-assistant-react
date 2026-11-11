@@ -12,6 +12,17 @@ export class ConfiguracaoLembretes {
     return this.lembretes.map(lembrete => lembrete.copiar()); // A quantidade é derivada desta lista; não existe um atributo de quantidade separado.
   }
 
+  toJSON() {
+    return this.lembretes.map(lembrete => lembrete.toJSON()); // Delega a conversão de cada entidade ao próprio modelo.
+  }
+
+  static fromJSON(dados: unknown): ConfiguracaoLembretes {
+    if (dados === undefined) return new ConfiguracaoLembretes(); // Mantém compatibilidade com arquivos antigos sem lembretes.
+    if (!Array.isArray(dados)) throw new Error('Configuração de lembretes persistida inválida');
+    const lembretes = dados.map(registro => Lembrete.fromJSON(registro)); // Recupera identidades, agendamentos e estados.
+    return new ConfiguracaoLembretes(lembretes); // O construtor também rejeita identidades duplicadas.
+  }
+
   add(lembrete: Lembrete): void { // Adiciona uma entidade já preparada; a entrada de configuração deve usar atualizar para validar o conjunto completo.
     ConfiguracaoLembretes.validarIdentificadores([...this.lembretes.map(item => item.getId()), lembrete.getId()]);
     this.lembretes.push(lembrete.copiar());

@@ -7,6 +7,8 @@ import { Classes } from './models/Classes';
 import { Class } from './models/Class';
 import { Report } from './models/Report';
 import { PeriodoAcademico } from './models/PeriodoAcademico';
+import { ConfiguracaoLembretes } from './models/ConfiguracaoLembretes';
+import { LembreteProposto } from './models/Lembrete';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EspecificacaoDoCalculoDaMedia, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from './models/EspecificacaoDoCalculoDaMedia';
@@ -48,8 +50,9 @@ const ensureDataDirectory = (): void => {
 };
 
 const saveDataToFile = (
-  periodosParaSalvar: ReadonlyMap<string, PeriodoAcademico> = periodosAcademicos
-): boolean => { // Permite gravar uma proposta sem alterar os períodos atuais e informa se a escrita foi concluída.
+  periodosParaSalvar: ReadonlyMap<string, PeriodoAcademico> = periodosAcademicos,
+  configuracoesParaSalvar: ReadonlyMap<string, ConfiguracaoLembretes> = new Map()
+): boolean => { // Grava a proposta antes de alterar períodos ou lembretes em memória.
   try {
     const data = {
       periodosAcademicos: Array.from(periodosParaSalvar.values()).map(periodo => ({
@@ -67,6 +70,9 @@ const saveDataToFile = (
         semester: classObj.getSemester(),
         year: classObj.getYear(),
         especificacaoDoCalculoDaMedia: classObj.getEspecificacaoDoCalculoDaMedia().toJSON(),
+        configuracaoLembretes: (
+          configuracoesParaSalvar.get(classObj.getClassId()) ?? classObj.obterConfiguracaoLembretes()
+        ).toJSON(), // Grava a proposta da turma ou sua configuração atual usando o método do modelo.
         enrollments: classObj.getEnrollments().map(enrollment => ({
           studentCPF: enrollment.getStudent().getCPF(),
           evaluations: enrollment.getEvaluations().map(evaluation => evaluation.toJSON())
@@ -80,8 +86,8 @@ const saveDataToFile = (
     fs.renameSync(arquivoTemporario, dataFile); // Substitui o arquivo somente após concluir a escrita.
     return true;
   } catch (error) {
-    console.error('Error saving students to file:', error);
-    return false; // A nova rota usa esse retorno para rejeitar a alteração sem modificar o período em memória.
+    console.error('Error saving application data:', error);
+    return false; // Permite rejeitar a alteração quando a gravação falha.
   }
 };
 
@@ -91,6 +97,10 @@ const loadDataFromFile = (): void => {
     if (fs.existsSync(dataFile)) {
       const fileContent = fs.readFileSync(dataFile, 'utf-8');
       const data = JSON.parse(fileContent);
+      const configuracoesSalvas: ConfiguracaoLembretes[] = Array.isArray(data.classes)
+        ? data.classes.map((turma: { configuracaoLembretes?: unknown }) =>
+          ConfiguracaoLembretes.fromJSON(turma.configuracaoLembretes))
+        : []; // Confere todos os lembretes antes de carregar as turmas; dados inválidos interrompem a inicialização.
 
       if (Array.isArray(data.periodosAcademicos)) { // Arquivos antigos continuam sendo lidos quando esse campo não existe.
         for (const registro of data.periodosAcademicos) {
@@ -140,10 +150,13 @@ const loadDataFromFile = (): void => {
 
       // Load classes with enrollments
       if (data.classes && Array.isArray(data.classes)) {
-        data.classes.forEach((classData: any) => {
+        data.classes.forEach((classData: any, index: number) => {
           try {
             const periodo = obterOuCriarPeriodoAcademico(Number(classData.year), Number(classData.semester));
             const classObj = new Class(classData.topic, periodo, EspecificacaoDoCalculoDaMedia.fromJSON(classData.especificacaoDoCalculoDaMedia)); // Associa a turma ao período já recuperado, sem copiar seu prazo.
+
+            configuracoesSalvas[index].listar().forEach(lembrete =>
+              classObj.obterConfiguracaoLembretes().add(lembrete)); // Recupera identidades, estados e agendamentos históricos.
 
             classes.addClass(classObj);
 
@@ -272,6 +285,54 @@ app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
       semestre,
       prazoAcademico: candidato.getPrazoAcademico()?.toISOString() ?? null
     });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+const apresentarConfiguracaoLembretes = (turma: Class) => ({
+  turmaId: turma.getClassId(),
+  prazoAcademico: turma.getPrazoAcademico()?.toISOString() ?? null,
+  lembretes: turma.obterConfiguracaoLembretes().toJSON()
+});
+
+app.get('/api/classes/:id/lembretes', (req: Request, res: Response) => {
+  const turma = classes.findClassById(req.params.id);
+  if (!turma) return res.status(404).json({ error: 'Turma não encontrada' });
+  res.json(apresentarConfiguracaoLembretes(turma)); // Consulta os lembretes e o prazo oficial da mesma turma.
+});
+
+app.put('/api/classes/:id/lembretes', (req: Request, res: Response) => {
+  try {
+    const turma = classes.findClassById(req.params.id);
+    if (!turma) return res.status(404).json({ error: 'Turma não encontrada' });
+    const prazo = turma.getPrazoAcademico();
+    if (prazo === null) {
+      return res.status(400).json({ error: 'Prazo acadêmico não definido para o período' });
+    }
+
+    const { quantidade, lembretes } = req.body ?? {};
+    if (!Array.isArray(lembretes) || lembretes.some(item =>
+      !item || typeof item.id !== 'string' || typeof item.data !== 'string' || typeof item.horario !== 'string'
+    )) {
+      return res.status(400).json({ error: 'Dados de lembretes inválidos' });
+    }
+    const propostas: LembreteProposto[] = lembretes.map(item => ({
+      id: item.id, data: item.data, horario: item.horario
+    })); // Descarta campos que tentariam alterar estado, motivo ou reenvio pela GUI.
+
+    const atual = turma.obterConfiguracaoLembretes();
+    const candidata = new ConfiguracaoLembretes(atual.listar());
+    const instanteAtual = new Date(); // Usa o relógio do servidor para toda a operação.
+    candidata.atualizar(quantidade, propostas, instanteAtual, prazo); // Valida a cópia sem alterar a configuração atual.
+
+    const configuracoesParaSalvar = new Map([[turma.getClassId(), candidata]]);
+    if (!isTestMode && !saveDataToFile(periodosAcademicos, configuracoesParaSalvar)) {
+      return res.status(500).json({ error: 'Não foi possível salvar os lembretes' });
+    }
+
+    atual.atualizar(quantidade, propostas, instanteAtual, prazo); // Publica a mesma proposta somente depois da gravação.
+    res.json(apresentarConfiguracaoLembretes(turma));
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }

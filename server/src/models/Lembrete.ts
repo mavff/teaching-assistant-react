@@ -83,6 +83,43 @@ export class Lembrete {
     });
   }
 
+  toJSON() {
+    return {
+      id: this.id,
+      data: this.data, // Mantém a data UTC usada pelo domínio.
+      horario: this.horario, // Mantém o horário UTC com precisão de minutos.
+      estado: this.estado,
+      motivo: this.motivo,
+      proximoReenvioEm: this.proximoReenvioEm?.toISOString() ?? null // Converte Date para texto ISO no JSON.
+    };
+  }
+
+  static fromJSON(dados: unknown): Lembrete {
+    if (typeof dados !== 'object' || dados === null) {
+      throw new Error('Registro de lembrete persistido inválido');
+    }
+    const registro = dados as Record<string, unknown>; // Permite conferir os campos recebidos antes de reconstruir a entidade.
+    if (
+      typeof registro.id !== 'string' || typeof registro.data !== 'string'
+      || typeof registro.horario !== 'string' || typeof registro.estado !== 'string'
+      || (registro.motivo !== null && typeof registro.motivo !== 'string')
+      || (registro.proximoReenvioEm !== null && typeof registro.proximoReenvioEm !== 'string')
+    ) {
+      throw new Error('Registro de lembrete persistido inválido');
+    }
+
+    return new Lembrete({
+      id: registro.id,
+      data: registro.data,
+      horario: registro.horario,
+      estado: registro.estado as EstadoLembrete, // O construtor valida se o texto corresponde a um estado permitido.
+      motivo: registro.motivo,
+      proximoReenvioEm: registro.proximoReenvioEm === null
+        ? null
+        : new Date(registro.proximoReenvioEm) // Recupera o instante do reenvio a partir do texto ISO.
+    }); // Reconstrói dados históricos sem exigir que o agendamento esteja no futuro.
+  }
+
   private static obterInstante(data: string, horario: string): Date {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}$/.test(horario)) {
       throw new Error('Data ou horário do lembrete inválido');
