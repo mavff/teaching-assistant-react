@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import AcademicPeriodSettings from './AcademicPeriodSettings';
-import { AcademicPeriod } from '../services/AcademicPeriodService';
+import AcademicPeriodSettings from '../../components/AcademicPeriodSettings';
+import { AcademicPeriod } from '../../services/AcademicPeriodService';
 
 /**
  * Testes de integração do componente com uma API simulada: salvamento, recuperação e rejeição do prazo.

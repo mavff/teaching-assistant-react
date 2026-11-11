@@ -7,6 +7,8 @@ import { Classes } from './models/Classes';
 import { Class } from './models/Class';
 import { Report } from './models/Report';
 import { PeriodoAcademico } from './models/PeriodoAcademico';
+import { ConfiguracaoLembretes } from './models/ConfiguracaoLembretes';
+import { LembreteProposto } from './models/Lembrete';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EspecificacaoDoCalculoDaMedia, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from './models/EspecificacaoDoCalculoDaMedia';
@@ -30,6 +32,15 @@ const classes = new Classes();
 const periodosAcademicos = new Map<string, PeriodoAcademico>(); // Mantém um período por identificação, como 2026.2, mesmo sem turmas cadastradas.
 const dataFile = path.resolve('./data/app-data.json');
 
+const obterOuCriarPeriodoAcademico = (ano: number, semestre: number): PeriodoAcademico => {
+  const identificador = `${ano}.${semestre}`;
+  const existente = periodosAcademicos.get(identificador);
+  if (existente) return existente; // Reutiliza a mesma instância para todas as turmas do período.
+  const novo = new PeriodoAcademico(ano, semestre); // Nenhum prazo é presumido para um período ainda não configurado.
+  periodosAcademicos.set(identificador, novo);
+  return novo;
+};
+
 // Persistence functions
 const ensureDataDirectory = (): void => {
   const dataDir = path.dirname(dataFile);
@@ -39,8 +50,9 @@ const ensureDataDirectory = (): void => {
 };
 
 const saveDataToFile = (
-  periodosParaSalvar: ReadonlyMap<string, PeriodoAcademico> = periodosAcademicos
-): boolean => { // Permite gravar uma proposta sem alterar os períodos atuais e informa se a escrita foi concluída.
+  periodosParaSalvar: ReadonlyMap<string, PeriodoAcademico> = periodosAcademicos,
+  configuracoesParaSalvar: ReadonlyMap<string, ConfiguracaoLembretes> = new Map()
+): boolean => { // Grava a proposta antes de alterar períodos ou lembretes em memória.
   try {
     const data = {
       periodosAcademicos: Array.from(periodosParaSalvar.values()).map(periodo => ({
@@ -57,8 +69,10 @@ const saveDataToFile = (
         topic: classObj.getTopic(),
         semester: classObj.getSemester(),
         year: classObj.getYear(),
-        prazoAcademico: classObj.getPrazoAcademico()?.toISOString() ?? null, // Inclui o prazo no JSON persistido junto dos dados da turma.
         especificacaoDoCalculoDaMedia: classObj.getEspecificacaoDoCalculoDaMedia().toJSON(),
+        configuracaoLembretes: (
+          configuracoesParaSalvar.get(classObj.getClassId()) ?? classObj.obterConfiguracaoLembretes()
+        ).toJSON(), // Grava a proposta da turma ou sua configuração atual usando o método do modelo.
         enrollments: classObj.getEnrollments().map(enrollment => ({
           studentCPF: enrollment.getStudent().getCPF(),
           evaluations: enrollment.getEvaluations().map(evaluation => evaluation.toJSON())
@@ -72,8 +86,8 @@ const saveDataToFile = (
     fs.renameSync(arquivoTemporario, dataFile); // Substitui o arquivo somente após concluir a escrita.
     return true;
   } catch (error) {
-    console.error('Error saving students to file:', error);
-    return false; // A nova rota usa esse retorno para rejeitar a alteração sem modificar o período em memória.
+    console.error('Error saving application data:', error);
+    return false; // Permite rejeitar a alteração quando a gravação falha.
   }
 };
 
@@ -83,6 +97,10 @@ const loadDataFromFile = (): void => {
     if (fs.existsSync(dataFile)) {
       const fileContent = fs.readFileSync(dataFile, 'utf-8');
       const data = JSON.parse(fileContent);
+      const configuracoesSalvas: ConfiguracaoLembretes[] = Array.isArray(data.classes)
+        ? data.classes.map((turma: { configuracaoLembretes?: unknown }) =>
+          ConfiguracaoLembretes.fromJSON(turma.configuracaoLembretes))
+        : []; // Confere todos os lembretes antes de carregar as turmas; dados inválidos interrompem a inicialização.
 
       if (Array.isArray(data.periodosAcademicos)) { // Arquivos antigos continuam sendo lidos quando esse campo não existe.
         for (const registro of data.periodosAcademicos) {
@@ -95,6 +113,22 @@ const loadDataFromFile = (): void => {
           periodosAcademicos.set(periodo.getIdentificador(), periodo); // Permite localizar o mesmo período pelo ano e semestre.
         }
       }
+
+      const periodosLegados = new Map<string, PeriodoAcademico>(); // Recupera prazos antigos por turma somente quando não há um período oficial salvo.
+      if (Array.isArray(data.classes)) {
+        for (const classData of data.classes) {
+          if (classData.prazoAcademico == null) continue;
+          const identificador = `${Number(classData.year)}.${Number(classData.semester)}`;
+          if (periodosAcademicos.has(identificador)) continue; // O período já cadastrado é a fonte oficial, inclusive quando está sem prazo.
+          const legado = new PeriodoAcademico(Number(classData.year), Number(classData.semester), new Date(classData.prazoAcademico));
+          const anterior = periodosLegados.get(identificador);
+          if (anterior && anterior.getPrazoAcademico()?.getTime() !== legado.getPrazoAcademico()?.getTime()) {
+            throw new Error(`Prazos acadêmicos antigos divergentes no período ${identificador}`); // Não escolhe silenciosamente um prazo entre turmas incompatíveis.
+          }
+          periodosLegados.set(identificador, legado);
+        }
+      }
+      periodosLegados.forEach((periodo, identificador) => periodosAcademicos.set(identificador, periodo));
       
       // Load students
       if (data.students && Array.isArray(data.students)) {
@@ -116,13 +150,13 @@ const loadDataFromFile = (): void => {
 
       // Load classes with enrollments
       if (data.classes && Array.isArray(data.classes)) {
-        data.classes.forEach((classData: any) => {
+        data.classes.forEach((classData: any, index: number) => {
           try {
-            const classObj = new Class(classData.topic, classData.semester, classData.year, EspecificacaoDoCalculoDaMedia.fromJSON(classData.especificacaoDoCalculoDaMedia));
+            const periodo = obterOuCriarPeriodoAcademico(Number(classData.year), Number(classData.semester));
+            const classObj = new Class(classData.topic, periodo, EspecificacaoDoCalculoDaMedia.fromJSON(classData.especificacaoDoCalculoDaMedia)); // Associa a turma ao período já recuperado, sem copiar seu prazo.
 
-            if (classData.prazoAcademico !== undefined && classData.prazoAcademico !== null) {
-              classObj.setPrazoAcademico(new Date(classData.prazoAcademico)); // Restaura o prazo usando a validação da entidade.
-            }
+            configuracoesSalvas[index].listar().forEach(lembrete =>
+              classObj.obterConfiguracaoLembretes().add(lembrete)); // Recupera identidades, estados e agendamentos históricos.
 
             classes.addClass(classObj);
 
@@ -164,6 +198,7 @@ const loadDataFromFile = (): void => {
     }
   } catch (error) {
     console.error('Error loading data from file:', error);
+    throw error; // Interrompe a inicialização se a leitura falhar, evitando sobrescrever o arquivo com dados carregados parcialmente.
   }
 };
 
@@ -250,6 +285,54 @@ app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
       semestre,
       prazoAcademico: candidato.getPrazoAcademico()?.toISOString() ?? null
     });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+const apresentarConfiguracaoLembretes = (turma: Class) => ({
+  turmaId: turma.getClassId(),
+  prazoAcademico: turma.getPrazoAcademico()?.toISOString() ?? null,
+  lembretes: turma.obterConfiguracaoLembretes().toJSON()
+});
+
+app.get('/api/classes/:id/lembretes', (req: Request, res: Response) => {
+  const turma = classes.findClassById(req.params.id);
+  if (!turma) return res.status(404).json({ error: 'Turma não encontrada' });
+  res.json(apresentarConfiguracaoLembretes(turma)); // Consulta os lembretes e o prazo oficial da mesma turma.
+});
+
+app.put('/api/classes/:id/lembretes', (req: Request, res: Response) => {
+  try {
+    const turma = classes.findClassById(req.params.id);
+    if (!turma) return res.status(404).json({ error: 'Turma não encontrada' });
+    const prazo = turma.getPrazoAcademico();
+    if (prazo === null) {
+      return res.status(400).json({ error: 'Prazo acadêmico não definido para o período' });
+    }
+
+    const { quantidade, lembretes } = req.body ?? {};
+    if (!Array.isArray(lembretes) || lembretes.some(item =>
+      !item || typeof item.id !== 'string' || typeof item.data !== 'string' || typeof item.horario !== 'string'
+    )) {
+      return res.status(400).json({ error: 'Dados de lembretes inválidos' });
+    }
+    const propostas: LembreteProposto[] = lembretes.map(item => ({
+      id: item.id, data: item.data, horario: item.horario
+    })); // Descarta campos que tentariam alterar estado, motivo ou reenvio pela GUI.
+
+    const atual = turma.obterConfiguracaoLembretes();
+    const candidata = new ConfiguracaoLembretes(atual.listar());
+    const instanteAtual = new Date(); // Usa o relógio do servidor para toda a operação.
+    candidata.atualizar(quantidade, propostas, instanteAtual, prazo); // Valida a cópia sem alterar a configuração atual.
+
+    const configuracoesParaSalvar = new Map([[turma.getClassId(), candidata]]);
+    if (!isTestMode && !saveDataToFile(periodosAcademicos, configuracoesParaSalvar)) {
+      return res.status(500).json({ error: 'Não foi possível salvar os lembretes' });
+    }
+
+    atual.atualizar(quantidade, propostas, instanteAtual, prazo); // Publica a mesma proposta somente depois da gravação.
+    res.json(apresentarConfiguracaoLembretes(turma));
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
@@ -390,22 +473,18 @@ app.get('/api/classes', (req: Request, res: Response) => {
 // POST /api/classes - Add a new class
 app.post('/api/classes', (req: Request, res: Response) => {
   try {
-    const { topic, semester, year, prazoAcademico } = req.body; // Obtém os dados da turma e o prazo informado pelo professor.
+    const { topic, semester, year, prazoAcademico } = req.body; // O prazo é recebido apenas para rejeitar a antiga edição por turma.
     
     if (!topic || !semester || !year) {
       return res.status(400).json({ error: 'Topic, semester, and year are required' });
     }
 
-    const classObj = new Class(topic, semester, year, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
-
-    if (prazoAcademico !== undefined) { // Mantém a compatibilidade com chamadas antigas que não enviavam prazo.
-      if (typeof prazoAcademico !== 'string') { // Verifica o formato recebido pelo HTTP antes de convertê-lo em Date.
-        return res.status(400).json({ error: 'Prazo acadêmico inválido' });
-      }
-
-      classObj.setPrazoAcademico(new Date(prazoAcademico)); // Converte o texto e delega a validação da data à entidade Class.
+    if (prazoAcademico !== undefined) {
+      return res.status(400).json({ error: 'Defina o prazo acadêmico na configuração do período' });
     }
 
+    const periodo = obterOuCriarPeriodoAcademico(Number(year), Number(semester));
+    const classObj = new Class(topic, periodo, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
     const newClass = classes.addClass(classObj); // Registra a turma somente após validar os dados fornecidos.
     triggerSave(); // Save to file after adding class
     res.status(201).json(newClass.toJSON());
@@ -418,7 +497,7 @@ app.post('/api/classes', (req: Request, res: Response) => {
 app.put('/api/classes/:id', (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { topic, semester, year, prazoAcademico } = req.body; // Recebe os dados da turma e, quando informado, o novo prazo.
+    const { topic, semester, year, prazoAcademico } = req.body; // A edição da turma não define um prazo independente do período.
     
     if (!topic || !semester || !year) {
       return res.status(400).json({ error: 'Topic, semester, and year are required' });
@@ -429,18 +508,15 @@ app.put('/api/classes/:id', (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Class not found' });
     }
 
-    if (prazoAcademico !== undefined) { // Altera o prazo somente quando o campo é enviado; a omissão preserva o valor anterior.
-      if (typeof prazoAcademico !== 'string') { // Rejeita valores que não podem representar a data no formato recebido pela API.
-        return res.status(400).json({ error: 'Prazo acadêmico inválido' });
-      }
-
-      existingClass.setPrazoAcademico(new Date(prazoAcademico)); // Delega à entidade a validação e a atualização do prazo.
+    if (prazoAcademico !== undefined) {
+      return res.status(400).json({ error: 'Defina o prazo acadêmico na configuração do período' });
     }
 
-    // Update the class directly using setters
+    const candidato = new PeriodoAcademico(Number(year), Number(semester)); // Valida a identidade de destino sem registrar uma alteração ainda não aceita.
+    const periodo = periodosAcademicos.get(candidato.getIdentificador()) ?? candidato;
+    existingClass.definirPeriodoAcademico(periodo); // Altera ano e semestre juntos, após conferir a compatibilidade dos lembretes existentes.
     existingClass.setTopic(topic);
-    existingClass.setSemester(semester);
-    existingClass.setYear(year);
+    periodosAcademicos.set(periodo.getIdentificador(), periodo); // Registra um período novo somente após aceitar a troca.
     
     triggerSave(); // Save to file after updating class
     res.json(existingClass.toJSON());
