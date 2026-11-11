@@ -2,20 +2,18 @@ import { Student } from './Student';
 import { Enrollment } from './Enrollment';
 import { EspecificacaoDoCalculoDaMedia } from './EspecificacaoDoCalculoDaMedia';
 import { ConfiguracaoLembretes } from './ConfiguracaoLembretes';
+import { PeriodoAcademico } from './PeriodoAcademico';
 
 export class Class {
   private topic: string;
-  private semester: number;
-  private year: number;
+  private periodoAcademico: PeriodoAcademico; // Referencia o período compartilhado pelas turmas do mesmo ano e semestre.
   private readonly especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia;
   private enrollments: Enrollment[];
-  private prazoAcademico: Date | null = null; // Turmas existentes começam sem prazo; nenhum prazo é presumido.
   private readonly configuracaoLembretes = new ConfiguracaoLembretes(); // Cria uma configuração exclusiva da turma; readonly impede substituir essa referência.
 
-  constructor(topic: string, semester: number, year: number, especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia, enrollments: Enrollment[] = []) {
+  constructor(topic: string, periodoAcademico: PeriodoAcademico, especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia, enrollments: Enrollment[] = []) {
     this.topic = topic;
-    this.semester = semester;
-    this.year = year;
+    this.periodoAcademico = periodoAcademico; // Mantém a referência recebida; não cria outro período nem copia seu prazo.
     this.especificacaoDoCalculoDaMedia = especificacaoDoCalculoDaMedia;
     this.enrollments = enrollments;
   }
@@ -26,21 +24,23 @@ export class Class {
   }
 
   getSemester(): number {
-    return this.semester;
+    return this.periodoAcademico.getSemestre(); // O semestre vem do período associado.
   }
 
   getYear(): number {
-    return this.year;
+    return this.periodoAcademico.getAno(); // O ano vem do período associado.
+  }
+
+  obterPeriodoAcademico(): PeriodoAcademico {
+    return this.periodoAcademico; // Disponibiliza a associação prevista no DDD.
   }
 
   obterConfiguracaoLembretes(): ConfiguracaoLembretes {
     return this.configuracaoLembretes; // Permite acessar os lembretes da turma pelas operações da configuração.
   }
 
-  getPrazoAcademico(): Date | null { // Permite consultar o prazo sem expor o objeto interno à alteração.
-    return this.prazoAcademico
-      ? new Date(this.prazoAcademico.getTime())
-      : null; // Retorna uma cópia da data ou indica que o prazo ainda não foi cadastrado.
+  getPrazoAcademico(): Date | null {
+    return this.periodoAcademico.getPrazoAcademico(); // Consulta o prazo oficial; o período já devolve uma cópia da data.
   }
 
   getEnrollments(): Enrollment[] {
@@ -49,7 +49,7 @@ export class Class {
 
   // Generate unique class ID
   getClassId(): string {
-    return `${this.topic}-${this.year}-${this.semester}`;
+    return `${this.topic}-${this.getYear()}-${this.getSemester()}`;
   }
 
   // Setters for editing
@@ -57,36 +57,26 @@ export class Class {
     this.topic = topic;
   }
 
-  setSemester(semester: number): void {
-    this.semester = semester;
-  }
-
-  setYear(year: number): void {
-    this.year = year;
-  }
-
-  setPrazoAcademico(prazoAcademico: Date): void { // Define ou altera o prazo da turma.
-    if (!Number.isFinite(prazoAcademico.getTime())) { // Uma data inválida produz um horário numérico inválido.
-      throw new Error('Prazo acadêmico inválido');
+  definirPeriodoAcademico(periodo: PeriodoAcademico): void {
+    if (periodo === this.periodoAcademico) return; // Editar outros dados da turma não troca sua associação atual.
+    const prazo = periodo.getPrazoAcademico();
+    if (prazo === null) {
+      const possuiPendentes = this.configuracaoLembretes.listar()
+        .some(lembrete => lembrete.getEstado() === 'Não enviado' || lembrete.getEstado() === 'Agendado');
+      if (possuiPendentes) throw new Error('Prazo acadêmico não definido para o período');
+    } else if (this.configuracaoLembretes.possuiAgendamentosPendentesApos(prazo)) {
+      throw new Error('Prazo acadêmico incompatível com lembretes pendentes');
     }
 
-    this.prazoAcademico = new Date(prazoAcademico.getTime()); // Guarda uma cópia para impedir alterações externas à data recebida.
+    this.periodoAcademico = periodo; // Troca ano e semestre juntos, preservando matrículas e a configuração de lembretes.
   }
 
   getEspecificacaoDoCalculoDaMedia(): EspecificacaoDoCalculoDaMedia {
     return this.especificacaoDoCalculoDaMedia;
   }
 
-  prazoEncerrado(instanteAtual: Date): boolean { // Implementa a consulta prevista no DDD usando o instante fornecido pelo serviço.
-    if (this.prazoAcademico === null) {
-      throw new Error('Prazo acadêmico não definido para a turma'); // Exige um prazo conhecido para avaliar seu encerramento.
-    }
-
-    if (!Number.isFinite(instanteAtual.getTime())) {
-      throw new Error('Instante atual inválido'); // Impede uma comparação que produziria um resultado incorreto.
-    }
-
-    return instanteAtual.getTime() > this.prazoAcademico.getTime(); // Exatamente no prazo ainda é permitido; somente depois dele está encerrado.
+  prazoEncerrado(instanteAtual: Date): boolean {
+    return this.periodoAcademico.prazoEncerrado(instanteAtual); // Reutiliza a regra do período, sem duplicar a comparação.
   }
 
   // Enrollment management
@@ -131,9 +121,9 @@ export class Class {
     return {
       id: this.getClassId(),
       topic: this.topic,
-      semester: this.semester,
-      year: this.year,
-      prazoAcademico: this.prazoAcademico?.toISOString() ?? null, // Converte a data para texto ISO; mantém null quando não existe prazo.
+      semester: this.getSemester(),
+      year: this.getYear(),
+      prazoAcademico: this.getPrazoAcademico()?.toISOString() ?? null, // Informação calculada para leitura; não é um prazo editável da turma.
       especificacaoDoCalculoDaMedia: this.especificacaoDoCalculoDaMedia.toJSON(),
       enrollments: this.enrollments.map(enrollment => enrollment.toJSON())
     };
@@ -146,8 +136,11 @@ export class Class {
     year: number;
     especificacaoDoCalculoDaMedia: any;
     enrollments: any[];
-    prazoAcademico?: string | null; // O campo pode estar ausente em dados antigos ou ser null em turmas sem prazo.
-  }, allStudents: Student[]): Class {
+    prazoAcademico?: string | null; // Pode existir em uma resposta antiga; o período informado é a fonte do prazo.
+  }, allStudents: Student[], periodoAcademico: PeriodoAcademico): Class {
+    if (data.year !== periodoAcademico.getAno() || data.semester !== periodoAcademico.getSemestre()) {
+      throw new Error('Período acadêmico incompatível com a turma'); // Impede reconstruir uma turma vinculada ao ano ou semestre errado.
+    }
     const enrollments = data.enrollments
       ? data.enrollments.map((enrollmentData: any) => {
           const student = allStudents.find(s => s.getCPF() === enrollmentData.student.cpf);
@@ -161,12 +154,6 @@ export class Class {
     // Novo carregamento do EspecificacaoDoCalculoDaMedia
     const especificacaoDoCalculoDaMedia = EspecificacaoDoCalculoDaMedia.fromJSON(data.especificacaoDoCalculoDaMedia);
 
-    const classObj = new Class(data.topic, data.semester, data.year, especificacaoDoCalculoDaMedia, enrollments); // Reconstrói os dados existentes da turma.
-
-    if (data.prazoAcademico !== undefined && data.prazoAcademico !== null) {
-      classObj.setPrazoAcademico(new Date(data.prazoAcademico)); // Converte o texto em Date e reutiliza a validação da entidade.
-    }
-
-    return classObj; // Retorna a turma com o prazo recuperado, quando informado.
+    return new Class(data.topic, periodoAcademico, especificacaoDoCalculoDaMedia, enrollments); // Reutiliza o período resolvido pelo chamador e preserva as matrículas.
   }
 }

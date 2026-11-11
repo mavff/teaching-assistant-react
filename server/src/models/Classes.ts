@@ -41,8 +41,7 @@ export class Classes {
 
     // Update basic fields of the existing class object
     existingClass.setTopic(updatedClass.getTopic());
-    existingClass.setSemester(updatedClass.getSemester());
-    existingClass.setYear(updatedClass.getYear());
+    // A busca pelo mesmo id já exige ano e semestre iguais; mantém a referência compartilhada do período existente.
     
     // Update enrollments: merge existing with updated enrollments
     const updatedEnrollments = updatedClass.getEnrollments();

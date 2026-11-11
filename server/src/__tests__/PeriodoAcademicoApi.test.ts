@@ -88,8 +88,8 @@ describe('API de períodos acadêmicos', () => {
   ])('rejeita conflito com $descricao de outra turma do mesmo período', async ({ data, reenvio }) => { // A rota deve fornecer ao domínio as configurações de todas as turmas afetadas.
     const anterior = new PeriodoAcademico(2099, 2, new Date(prazoOriginal));
     periodosAcademicos.set(anterior.getIdentificador(), anterior);
-    const primeira = new Class('ESS', 2, 2099, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
-    const segunda = new Class('Introdução a Programação', 2, 2099, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
+    const primeira = new Class('ESS', anterior, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
+    const segunda = new Class('Introdução a Programação', anterior, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
     primeira.obterConfiguracaoLembretes().add(new Lembrete({ id: 'primeiro', data: '2099-08-25', horario: '09:00' }));
     segunda.obterConfiguracaoLembretes().add(new Lembrete({ id: 'segundo', data, horario: '14:00', estado: 'Agendado', proximoReenvioEm: reenvio }));
     classes.addClass(primeira);
@@ -105,8 +105,12 @@ describe('API de períodos acadêmicos', () => {
   });
 
   test('não inclui turmas de outro ano ou semestre na validação do prazo', async () => { // Lembretes de outros períodos não podem bloquear o período editado.
-    const outroSemestre = new Class('ESS', 1, 2099, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
-    const outroAno = new Class('ESS', 2, 2098, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
+    const periodoOutroSemestre = new PeriodoAcademico(2099, 1);
+    const periodoOutroAno = new PeriodoAcademico(2098, 2);
+    periodosAcademicos.set(periodoOutroSemestre.getIdentificador(), periodoOutroSemestre);
+    periodosAcademicos.set(periodoOutroAno.getIdentificador(), periodoOutroAno);
+    const outroSemestre = new Class('ESS', periodoOutroSemestre, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
+    const outroAno = new Class('ESS', periodoOutroAno, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
     for (const turma of [outroSemestre, outroAno]) {
       turma.obterConfiguracaoLembretes().add(new Lembrete({ id: turma.getClassId(), data: '2099-08-29', horario: '14:00' }));
       classes.addClass(turma);
@@ -118,5 +122,49 @@ describe('API de períodos acadêmicos', () => {
     expect(periodosAcademicos.get('2099.2')?.getPrazoAcademico()).toEqual(new Date(prazoNovo));
     expect([outroSemestre.obterConfiguracaoLembretes().listar(), outroAno.obterConfiguracaoLembretes().listar()])
       .toEqual(configuracoesAnteriores);
+  });
+
+  test('turmas cadastradas antes e depois do prazo compartilham suas alterações', async () => { // Confere a referência única pelas rotas reais de cadastro e consulta.
+    const primeira = await request(app).post('/api/classes').send({ topic: 'ESS', year: 2099, semester: 2 }).expect(201);
+    expect(primeira.body.prazoAcademico).toBeNull();
+    const periodo = periodosAcademicos.get('2099.2');
+
+    await request(app).put(rota).send({ prazoAcademico: prazoOriginal }).expect(200);
+    const segunda = await request(app).post('/api/classes').send({ topic: 'Introdução a Programação', year: 2099, semester: 2 }).expect(201);
+    await request(app).put(rota).send({ prazoAcademico: prazoNovo }).expect(200);
+
+    expect(classes.findClassById(primeira.body.id)?.obterPeriodoAcademico()).toBe(periodo);
+    expect(classes.findClassById(segunda.body.id)?.obterPeriodoAcademico()).toBe(periodo);
+    const consulta = await request(app).get('/api/classes').expect(200);
+    expect(consulta.body.map((turma: { prazoAcademico: string | null }) => turma.prazoAcademico)).toEqual([prazoNovo, prazoNovo]);
+  });
+
+  test('editar ano e semestre associa a turma ao período de destino já cadastrado', async () => { // A edição deve consultar o destino, sem carregar o prazo do período anterior.
+    await request(app).put(rota).send({ prazoAcademico: prazoOriginal }).expect(200);
+    const prazoDestino = '2100-06-30T23:59:00.000Z';
+    await request(app).put('/api/periodos-academicos/2100/1').send({ prazoAcademico: prazoDestino }).expect(200);
+    const criada = await request(app).post('/api/classes').send({ topic: 'ESS', year: 2099, semester: 2 }).expect(201);
+
+    const editada = await request(app).put(`/api/classes/${criada.body.id}`)
+      .send({ topic: 'ESS', year: 2100, semester: 1 }).expect(200);
+
+    expect(editada.body).toMatchObject({ year: 2100, semester: 1, prazoAcademico: prazoDestino });
+    expect(classes.findClassById(editada.body.id)?.obterPeriodoAcademico()).toBe(periodosAcademicos.get('2100.1'));
+    expect(periodosAcademicos.get('2099.2')?.getPrazoAcademico()).toEqual(new Date(prazoOriginal));
+  });
+
+  test('não aceita um prazo independente nas rotas de cadastro ou edição da turma', async () => { // Impede que a API antiga volte a criar duas fontes de prazo.
+    await request(app).put(rota).send({ prazoAcademico: prazoOriginal }).expect(200);
+    const dados = { topic: 'ESS', year: 2099, semester: 2 };
+    const cadastroRejeitado = await request(app).post('/api/classes').send({ ...dados, prazoAcademico: prazoNovo }).expect(400);
+    expect(cadastroRejeitado.body.error).toBe('Defina o prazo acadêmico na configuração do período');
+    expect(classes.getCount()).toBe(0);
+
+    const criada = await request(app).post('/api/classes').send(dados).expect(201);
+    const edicaoRejeitada = await request(app).put(`/api/classes/${criada.body.id}`)
+      .send({ ...dados, prazoAcademico: prazoNovo }).expect(400);
+
+    expect(edicaoRejeitada.body.error).toBe('Defina o prazo acadêmico na configuração do período');
+    expect(classes.findClassById(criada.body.id)?.getPrazoAcademico()).toEqual(new Date(prazoOriginal));
   });
 });
