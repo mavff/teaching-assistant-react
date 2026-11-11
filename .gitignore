@@ -11,3 +11,7 @@ coverage/
 
 # multer folder
 tmp_data/
+# Cypress
+client/cypress/screenshots/
+client/cypress/videos/
+client/cypress/downloads/

@@ -8,6 +8,8 @@
     "react-scripts": "5.0.1"
   },
   "devDependencies": {
+    "@badeball/cypress-cucumber-preprocessor": "^28.0.1",
+    "@bahmutov/cypress-esbuild-preprocessor": "^2.2.8",
     "@cucumber/cucumber": "^12.2.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -16,6 +18,8 @@
     "@types/puppeteer": "^5.4.7",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
+    "cypress": "^14.5.4",
+    "esbuild": "^0.28.2",
     "expect": "^27.5.1",
     "jest-cucumber": "^4.5.0",
     "puppeteer": "^24.30.0",
@@ -28,7 +32,9 @@
     "test": "react-scripts test",
     "test:cucumber": "npx cucumber-js --config cucumber.js",
     "test:cucumber:watch": "npx cucumber-js --config cucumber.js --watch",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "cypress:open": "cypress open --e2e",
+    "cypress:run": "cypress run --e2e"
   },
   "eslintConfig": {
     "extends": [

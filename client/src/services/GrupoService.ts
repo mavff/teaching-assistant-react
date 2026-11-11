@@ -18,6 +18,8 @@ export interface Notificacao {
   destinatario: string;
   tipo: string;
   mensagem: string;
+  resultado?: string;
+  descricaoFalha?: string;
 }
 
 const baseUrl = 'http://localhost:3005/api';
