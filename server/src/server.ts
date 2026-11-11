@@ -9,6 +9,8 @@ import { Report } from './models/Report';
 import { PeriodoAcademico } from './models/PeriodoAcademico';
 import { ConfiguracaoLembretes } from './models/ConfiguracaoLembretes';
 import { LembreteProposto } from './models/Lembrete';
+import { Services } from './models/Services';
+import { grupoRoutes } from './routes/grupos';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EspecificacaoDoCalculoDaMedia, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from './models/EspecificacaoDoCalculoDaMedia';
@@ -705,8 +707,12 @@ app.get('/api/classes/:classId/report', (req: Request, res: Response) => {
 });
 
 
+// Groups, monitors and the notifications sent when a group changes
+const services = new Services();
+app.use('/api', grupoRoutes(services));
+
 // Export the app for testing
-export { app, studentSet, classes, periodosAcademicos };
+export { app, studentSet, classes, periodosAcademicos, services };
 
 // Only start the server if this file is run directly (not imported for testing)
 if (require.main === module) {

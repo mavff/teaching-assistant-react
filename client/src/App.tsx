@@ -7,10 +7,11 @@ import StudentList from './components/StudentList';
 import StudentForm from './components/StudentForm';
 import Evaluations from './components/Evaluations';
 import Classes from './components/Classes';
+import Grupos from './components/Grupos';
 import AcademicPeriodSettings from './components/AcademicPeriodSettings';
 import './App.css';
 
-type TabType = 'students' | 'evaluations' | 'classes';
+type TabType = 'students' | 'evaluations' | 'classes' | 'groups';
 
 const App: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -147,6 +148,13 @@ const App: React.FC = () => {
           >
             Classes
           </button>
+          <button
+            className={`tab-button ${activeTab === 'groups' ? 'active' : ''}`}
+            onClick={() => setActiveTab('groups')}
+            data-testid="groups-tab"
+          >
+            Groups
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -219,6 +227,8 @@ const App: React.FC = () => {
               />
             </>
           )}
+
+          {activeTab === 'groups' && <Grupos />}
         </div>
       </main>
     </div>
