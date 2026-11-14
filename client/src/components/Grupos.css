@@ -1,0 +1,113 @@
+/* Aba Groups: estilos com prefixo gp- para não afetar as outras abas. */
+.grupos { display: flex; flex-direction: column; gap: 1.75rem; }
+
+.gp-titulo h2 { font-size: 1.6rem; color: #2d3748; }
+.gp-titulo p { color: #718096; font-size: 0.95rem; }
+
+/* Mensagens */
+.grupos .gp-mensagem {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.85rem 1rem; border-radius: 8px; font-size: 0.95rem; margin: 0;
+}
+.grupos .gp-mensagem::before { font-weight: 700; font-size: 1.1rem; }
+.grupos .gp-mensagem--erro { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
+.grupos .gp-mensagem--erro::before { content: '⚠'; }
+.grupos .gp-mensagem--sucesso { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+.grupos .gp-mensagem--sucesso::before { content: '✓'; }
+
+/* Seções */
+.gp-secao > h3 {
+  font-size: 1.1rem; color: #2d3748; margin-bottom: 0.9rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.gp-contador {
+  background: #edf2f7; color: #4a5568; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; padding: 0.1rem 0.6rem;
+}
+.gp-vazio { color: #a0aec0; font-size: 0.9rem; font-style: italic; }
+
+/* Cartões dos grupos */
+.gp-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.25rem; }
+.gp-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.gp-card-topo {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.9rem 1.1rem; color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.gp-card-topo h3 { font-size: 1.1rem; letter-spacing: 0.02em; margin: 0; }
+.gp-monitor { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; opacity: 0.95; }
+.gp-pill {
+  display: inline-block; border-radius: 999px; padding: 0.15rem 0.7rem;
+  font-size: 0.8rem; font-weight: 600;
+}
+.gp-pill--ok { background: #c6f6d5; color: #22543d; }
+.gp-pill--vazio { background: rgba(255, 255, 255, 0.25); color: #fff; }
+
+.gp-card-corpo { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 1rem; }
+.gp-rotulo {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #a0aec0; font-weight: 700; margin-bottom: 0.4rem;
+}
+.gp-alunos { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; }
+.gp-aluno {
+  background: #ebf4ff; color: #3c4fa0; border-radius: 999px;
+  padding: 0.2rem 0.75rem; font-size: 0.85rem; font-weight: 500;
+}
+
+.gp-acoes { display: flex; flex-direction: column; gap: 0.7rem; border-top: 1px solid #edf2f7; padding-top: 0.9rem; }
+.gp-linha { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.grupos select, .grupos input {
+  flex: 1 1 140px; min-width: 0; padding: 0.5rem 0.65rem; font-size: 0.88rem;
+  border: 1px solid #cbd5e0; border-radius: 6px; background: #fff; color: #2d3748;
+}
+.grupos select:focus, .grupos input:focus {
+  outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+/* Botões (sobrescrevem o estilo global de button só nesta aba) */
+.grupos .gp-btn {
+  min-width: 0; padding: 0.5rem 0.9rem; font-size: 0.85rem; font-weight: 600;
+  border-radius: 6px; border: 1px solid transparent; cursor: pointer;
+}
+.grupos .gp-btn--primario { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+.grupos .gp-btn--primario:hover { box-shadow: 0 3px 10px rgba(102, 126, 234, 0.35); transform: translateY(-1px); }
+.grupos .gp-btn--secundario { background: #fff; color: #4c51bf; border-color: #c3dafe; }
+.grupos .gp-btn--secundario:hover { background: #ebf4ff; }
+.grupos .gp-btn--perigo { background: #fff; color: #c53030; border-color: #feb2b2; }
+.grupos .gp-btn--perigo:hover { background: #fff5f5; }
+
+/* Monitores da disciplina */
+.gp-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.gp-monitor-item {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 1rem;
+}
+.gp-monitor-login { font-weight: 600; color: #2d3748; min-width: 130px; }
+.gp-status { border-radius: 999px; padding: 0.1rem 0.65rem; font-size: 0.78rem; font-weight: 600; }
+.gp-status--alocado { background: #c6f6d5; color: #22543d; }
+.gp-status--livre { background: #edf2f7; color: #4a5568; }
+.gp-monitor-grupos { color: #4a5568; font-size: 0.88rem; }
+.gp-tag-auto { background: #fefcbf; color: #744210; border-radius: 6px; padding: 0.1rem 0.5rem; font-size: 0.75rem; font-weight: 600; }
+
+/* Notificações */
+.gp-notificacao {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.75rem;
+  background: #fff; border: 1px solid #e2e8f0; border-left-width: 4px; border-radius: 8px;
+  padding: 0.55rem 0.9rem; font-size: 0.9rem;
+}
+.gp-notificacao[data-tipo='alocacao'] { border-left-color: #667eea; }
+.gp-notificacao[data-tipo='aviso'] { border-left-color: #4299e1; }
+.gp-notificacao[data-tipo='saida'] { border-left-color: #ed8936; }
+.gp-notificacao[data-tipo='entrada'] { border-left-color: #48bb78; }
+.gp-notificacao[data-tipo='remocao'] { border-left-color: #f56565; }
+.gp-notificacao[data-tipo='acumulo'] { border-left-color: #38b2ac; }
+.gp-tipo { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #4a5568; min-width: 70px; }
+.gp-notificacao-texto { display: flex; flex-direction: column; }
+.gp-destinatario { font-weight: 600; color: #2d3748; }
+.gp-mensagem-texto { color: #718096; font-size: 0.82rem; }
+.gp-grupo-tag { background: #edf2f7; color: #4a5568; border-radius: 6px; padding: 0.1rem 0.5rem; font-size: 0.75rem; font-weight: 600; }
+.gp-falha { background: #fed7d7; color: #9b2c2c; border-radius: 6px; padding: 0.1rem 0.5rem; font-size: 0.75rem; font-weight: 600; margin-left: 0.4rem; }
