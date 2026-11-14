@@ -14,6 +14,7 @@ import { grupoRoutes } from './routes/grupos';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EspecificacaoDoCalculoDaMedia, DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from './models/EspecificacaoDoCalculoDaMedia';
+import { EmailSenderSimulado } from './models/EmailSender';
 
 // usado para ler arquivos em POST
 const multer = require('multer');
@@ -31,6 +32,7 @@ app.use(express.json());
 // In-memory storage with file persistence
 const studentSet = new StudentSet();
 const classes = new Classes();
+const emailSender = new EmailSenderSimulado();
 const periodosAcademicos = new Map<string, PeriodoAcademico>(); // Mantém um período por identificação, como 2026.2, mesmo sem turmas cadastradas.
 const dataFile = path.resolve('./data/app-data.json');
 
@@ -65,7 +67,8 @@ const saveDataToFile = (
       students: studentSet.getAllStudents().map(student => ({
         name: student.name,
         cpf: student.getCPF(),
-        email: student.email
+        email: student.email,
+        lastGradeNotificationDate: student.lastGradeNotificationDate
       })),
       classes: classes.getAllClasses().map(classObj => ({
         topic: classObj.getTopic(),
@@ -141,6 +144,7 @@ const loadDataFromFile = (): void => {
             studentData.cpf,
             studentData.email
           );
+          student.lastGradeNotificationDate = studentData.lastGradeNotificationDate ?? null;
           
           try {
             studentSet.addStudent(student);
@@ -355,7 +359,7 @@ app.post('/api/students', (req: Request, res: Response) => {
   try {
     const { name, cpf, email } = req.body;
     
-    if (!name || !cpf || !email) {
+    if (!name || !cpf || email === undefined || email === null) {
       return res.status(400).json({ error: 'Name, CPF, and email are required' });
     }
 
@@ -375,7 +379,7 @@ app.put('/api/students/:cpf', (req: Request, res: Response) => {
     const { cpf } = req.params;
     const { name, email } = req.body;
     
-    if (!name || !email) {
+    if (!name || email === undefined || email === null) {
       return res.status(400).json({ error: 'Name and email are required for update' });
     }
     
@@ -674,8 +678,30 @@ app.put('/api/classes/:classId/enrollments/:studentCPF/evaluation', (req: Reques
       enrollment.addOrUpdateEvaluation(goal, grade);
     }
 
+    const student = enrollment.getStudent();
+    let emailAlert: string | undefined;
+    if (!student.email) {
+      emailAlert = 'No email address registered for this student';
+    } else {
+      const currentDate = new Date();
+      const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+      if (student.lastGradeNotificationDate !== today) {
+        const gradeChange = grade ? `updated to ${grade}` : 'removed';
+        const emailResult = emailSender.send(
+          student.email,
+          `Grade update: ${classObj.getTopic()}`,
+          `Hello ${student.name}, your grade for ${goal} in ${classObj.getTopic()} has been ${gradeChange}.`
+        );
+        if (emailResult.aceito) {
+          student.lastGradeNotificationDate = today;
+        } else {
+          emailAlert = emailResult.descricaoFalha || 'Email notification could not be sent';
+        }
+      }
+    }
+
     triggerSave(); // Save to file after evaluation update
-    res.json(enrollment.toJSON());
+    res.json(emailAlert ? { ...enrollment.toJSON(), emailAlert } : enrollment.toJSON());
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
