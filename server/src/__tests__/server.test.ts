@@ -239,24 +239,23 @@ describe('Server API - Student Endpoints', () => {
         }
       });
 
-      test('should reject empty or whitespace-only email', async () => {
-        const invalidEmailCases = [
-          '',     // Empty string
-          '   '   // Whitespace only
+      test('should accept empty or whitespace-only email', async () => {
+        const emptyEmailCases = [
+          { email: '', cpf: '12345678901' },
+          { email: '   ', cpf: '98765432100' }
         ];
 
-        for (const email of invalidEmailCases) {
+        for (const { email, cpf } of emptyEmailCases) {
           const response = await request(app)
             .post('/api/students')
             .send({
               name: 'Test User',
-              cpf: '12345678901',
+              cpf: cpf,
               email: email
             })
-            .expect(400);
+            .expect(201);
 
-          // Whitespace email might be validated as invalid format, empty as required field
-          expect(response.body.error).toMatch(/required|Invalid email format/);
+          expect(response.body.email).toBe('');
         }
       });
 
