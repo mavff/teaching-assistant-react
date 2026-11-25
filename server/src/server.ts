@@ -751,7 +751,9 @@ app.get('/api/classes/:classId/report', (req: Request, res: Response) => {
 
 
 // Groups, monitors and the notifications sent when a group changes
-const services = new Services();
+// Grupos: o e-mail de cada aluno vem do cadastro de alunos (o primeiro com o mesmo nome).
+const services = new Services(undefined, undefined, undefined, undefined, undefined,
+  nome => studentSet.getAllStudents().find(aluno => aluno.name === nome)?.email || undefined);
 app.use('/api', grupoRoutes(services));
 
 // Export the app for testing

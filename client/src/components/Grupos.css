@@ -4,16 +4,36 @@
 .gp-titulo h2 { font-size: 1.6rem; color: #2d3748; }
 .gp-titulo p { color: #718096; font-size: 0.95rem; }
 
-/* Mensagens */
-.grupos .gp-mensagem {
-  display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.85rem 1rem; border-radius: 8px; font-size: 0.95rem; margin: 0;
+/* Avisos de sucesso e erro: fixos no canto superior direito da janela */
+.gp-avisos {
+  position: fixed; top: 1.25rem; right: 1.25rem; z-index: 1000;
+  display: flex; flex-direction: column; gap: 0.6rem;
+  width: min(380px, calc(100vw - 2.5rem));
+  pointer-events: none; /* só os avisos recebem cliques, não o espaço vazio entre eles */
 }
-.grupos .gp-mensagem::before { font-weight: 700; font-size: 1.1rem; }
-.grupos .gp-mensagem--erro { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
-.grupos .gp-mensagem--erro::before { content: '⚠'; }
-.grupos .gp-mensagem--sucesso { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
-.grupos .gp-mensagem--sucesso::before { content: '✓'; }
+.gp-aviso {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  padding: 0.85rem 1rem; border-radius: 10px; font-size: 0.95rem;
+  background: #fff; border: 1px solid; border-left-width: 5px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  animation: gp-aviso-entrada 0.2s ease-out;
+}
+.gp-aviso::before { font-weight: 700; font-size: 1.1rem; line-height: 1.2; }
+.gp-aviso--erro { color: #c53030; border-color: #feb2b2; border-left-color: #e53e3e; background: #fff5f5; }
+.gp-aviso--erro::before { content: '⚠'; }
+.gp-aviso--sucesso { color: #276749; border-color: #9ae6b4; border-left-color: #38a169; background: #f0fff4; }
+.gp-aviso--sucesso::before { content: '✓'; }
+.gp-aviso-texto { flex: 1; line-height: 1.4; }
+.grupos .gp-aviso-fechar {
+  min-width: 0; padding: 0 0.25rem; border: none; background: transparent;
+  color: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; opacity: 0.7;
+}
+.grupos .gp-aviso-fechar:hover { opacity: 1; }
+@keyframes gp-aviso-entrada {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 /* Seções */
 .gp-secao > h3 {
@@ -25,6 +45,13 @@
   font-size: 0.75rem; font-weight: 600; padding: 0.1rem 0.6rem;
 }
 .gp-vazio { color: #a0aec0; font-size: 0.9rem; font-style: italic; }
+
+/* Cadastro de grupos e monitores */
+.gp-cadastro { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; }
+.gp-form {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); padding: 1rem 1.1rem;
+}
 
 /* Cartões dos grupos */
 .gp-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.25rem; }
@@ -86,7 +113,6 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
   background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 1rem;
 }
-.gp-monitor-login { font-weight: 600; color: #2d3748; min-width: 130px; }
 .gp-status { border-radius: 999px; padding: 0.1rem 0.65rem; font-size: 0.78rem; font-weight: 600; }
 .gp-status--alocado { background: #c6f6d5; color: #22543d; }
 .gp-status--livre { background: #edf2f7; color: #4a5568; }
@@ -111,3 +137,21 @@
 .gp-mensagem-texto { color: #718096; font-size: 0.82rem; }
 .gp-grupo-tag { background: #edf2f7; color: #4a5568; border-radius: 6px; padding: 0.1rem 0.5rem; font-size: 0.75rem; font-weight: 600; }
 .gp-falha { background: #fed7d7; color: #9b2c2c; border-radius: 6px; padding: 0.1rem 0.5rem; font-size: 0.75rem; font-weight: 600; margin-left: 0.4rem; }
+
+/* Alunos escolhidos para o novo grupo */
+.gp-escolhidos { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0 0; padding: 0; }
+.gp-escolhido {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: #ebf4ff; color: #3c4fa0; border-radius: 999px;
+  padding: 0.2rem 0.4rem 0.2rem 0.75rem; font-size: 0.85rem; font-weight: 500;
+}
+.grupos .gp-remover-escolhido {
+  min-width: 0; padding: 0 0.35rem; border: none; background: transparent;
+  color: #3c4fa0; font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.grupos .gp-remover-escolhido:hover { color: #c53030; }
+
+/* Nome, login e e-mail do monitor */
+.gp-monitor-nome { display: flex; flex-direction: column; min-width: 200px; }
+.gp-monitor-nome strong { color: #2d3748; }
+.gp-monitor-detalhe { color: #718096; font-size: 0.8rem; }

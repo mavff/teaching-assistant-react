@@ -13,7 +13,7 @@ describe('API de grupos, monitores e notificações', () => {
   const resetar = () => request(app).post('/api/test/reset').expect(204);
   const limparNotificacoes = () => request(app).post('/api/test/reset-notificacoes').expect(204);
   const cadastrarMonitor = (login: string) =>
-    request(app).post('/api/monitores').send({ login }).expect(201);
+    request(app).post('/api/monitores').send({ login, nome: `Monitor ${login}`, email: `${login}@cin.ufpe.br` }).expect(201);
   const criarGrupo = (nome: string, alunos: string[]) =>
     request(app).post('/api/grupos').send({ nome, alunos }).expect(201);
   const alocar = (nome: string, monitor?: string) =>
@@ -63,7 +63,7 @@ describe('API de grupos, monitores e notificações', () => {
 
     const resposta = await alocar('ESS-G3').expect(400);
 
-    expect(resposta.body.error).toBe('Não há monitor disponível');
+    expect(resposta.body.error).toBe('No monitor available');
     expect(await notificacoes()).toEqual([]);
     expect((await grupo('ESS-G3'))!.monitor).toBeNull();
   });
@@ -73,7 +73,7 @@ describe('API de grupos, monitores e notificações', () => {
 
     const resposta = await request(app).post('/api/grupos/ESS-G3/alunos').send({ aluno: 'Pedro' }).expect(400);
 
-    expect(resposta.body.error).toBe('O aluno já pertence ao grupo');
+    expect(resposta.body.error).toBe('The student is already in the group');
     expect(await notificacoes()).toEqual([]);
     expect((await grupo('ESS-G3'))!.alunos).toEqual(['Mariana', 'Pedro']);
   });
@@ -100,7 +100,10 @@ describe('API de grupos, monitores e notificações', () => {
     expect(resposta.body).toMatchObject({ monitor: 'mariaeduarda', alocacaoAutomatica: true });
     expect(destinatarios(await notificacoes('ESS-G5'), 'alocacao')).toEqual(['Julia', 'Rafael', 'mariaeduarda']);
     expect((await request(app).get('/api/monitores/situacao').expect(200)).body).toEqual([
-      { login: 'mariaeduarda', situacao: 'alocado', grupos: ['ESS-G5'], alocacaoAutomatica: true }
+      {
+        login: 'mariaeduarda', nome: 'Monitor mariaeduarda', email: 'mariaeduarda@cin.ufpe.br',
+        situacao: 'alocado', grupos: ['ESS-G5'], alocacaoAutomatica: true
+      }
     ]);
     expect((await request(app).get('/api/monitores').expect(200)).body).toEqual([]);
   });
@@ -120,7 +123,7 @@ describe('API de grupos, monitores e notificações', () => {
     const resposta = await request(app).post('/api/grupos/ESS-G3/realocar-monitor')
       .send({ monitor: 'joaosilva', destino: 'ESS-G4' }).expect(400);
 
-    expect(resposta.body.error).toBe('Grupo de destino não existe');
+    expect(resposta.body.error).toBe('Destination group does not exist');
     expect(await notificacoes()).toEqual([]);
     expect((await grupo('ESS-G3'))!.monitor).toBe('joaosilva');
   });
@@ -150,9 +153,72 @@ describe('API de grupos, monitores e notificações', () => {
   });
 
   it('responde 400 para grupo inexistente e para monitor não cadastrado', async () => {
-    expect((await alocar('ESS-G9', 'joaosilva').expect(400)).body.error).toBe('Grupo não existe');
+    expect((await alocar('ESS-G9', 'joaosilva').expect(400)).body.error).toBe('Group does not exist');
     await criarGrupo('ESS-G3', []);
-    expect((await alocar('ESS-G3', 'ninguem').expect(400)).body.error).toBe('Monitor não existe');
+    expect((await alocar('ESS-G3', 'ninguem').expect(400)).body.error).toBe('Monitor does not exist');
     expect(await notificacoes()).toEqual([]);
+  });
+
+  it('cadastra monitor com login, nome e e-mail', async () => {
+    const resposta = await request(app).post('/api/monitores')
+      .send({ login: 'joaosilva', nome: 'João Silva', email: 'joao@cin.ufpe.br' }).expect(201);
+
+    expect(resposta.body).toEqual({ login: 'joaosilva', nome: 'João Silva', email: 'joao@cin.ufpe.br' });
+    expect((await request(app).get('/api/monitores/situacao').expect(200)).body).toEqual([
+      { login: 'joaosilva', nome: 'João Silva', email: 'joao@cin.ufpe.br', situacao: 'livre', grupos: [], alocacaoAutomatica: false }
+    ]);
+  });
+
+  it('responde 400 para e-mail inválido e para monitor já cadastrado', async () => {
+    const enviar = (corpo: object) => request(app).post('/api/monitores').send(corpo).expect(400);
+
+    expect((await enviar({ login: 'joaosilva', nome: 'João Silva', email: 'joao' })).body.error)
+      .toBe('Invalid monitor email');
+    await cadastrarMonitor('joaosilva');
+    expect((await enviar({ login: 'joaosilva', nome: 'Outro', email: 'outro@cin.ufpe.br' })).body.error)
+      .toBe('Monitor already registered');
+  });
+
+  it('responde 400 e não notifica ao alocar monitor em grupo que já tem monitor', async () => {
+    await grupoCom('ESS-G3', ['Mariana', 'Pedro'], 'joaosilva');
+    await cadastrarMonitor('mariaeduarda');
+
+    expect((await alocar('ESS-G3', 'mariaeduarda').expect(400)).body.error).toBe('The group already has a monitor');
+    expect(await notificacoes()).toEqual([]);
+    expect((await grupo('ESS-G3'))!.monitor).toBe('joaosilva');
+  });
+
+  it('responde 400 ao realocar monitor que não está no grupo de origem', async () => {
+    await grupoCom('ESS-G3', ['Mariana', 'Pedro'], 'mariaeduarda');
+    await cadastrarMonitor('joaosilva');
+    await grupoCom('ESS-G4', ['Lucas', 'Beatriz']);
+
+    const resposta = await request(app).post('/api/grupos/ESS-G3/realocar-monitor')
+      .send({ monitor: 'joaosilva', destino: 'ESS-G4' }).expect(400);
+
+    expect(resposta.body.error).toBe('The monitor is not allocated to the source group');
+    expect((await grupo('ESS-G3'))!.monitor).toBe('mariaeduarda');
+    expect((await grupo('ESS-G4'))!.monitor).toBeNull();
+    expect(await notificacoes()).toEqual([]);
+  });
+
+  it('responde 400 e não notifica ao adicionar aluno que já pertence a outro grupo', async () => {
+    await grupoCom('ESS-G3', ['Carla', 'Pedro']);
+    await grupoCom('ESS-G4', ['Lucas', 'Beatriz'], 'joaosilva');
+
+    const resposta = await request(app).post('/api/grupos/ESS-G4/alunos').send({ aluno: 'Carla' }).expect(400);
+
+    expect(resposta.body.error).toBe('Carla is already in group ESS-G3');
+    expect((await grupo('ESS-G4'))!.alunos).toEqual(['Lucas', 'Beatriz']);
+    expect(await notificacoes()).toEqual([]);
+  });
+
+  it('responde 400 e não cria grupo com aluno que já pertence a outro grupo', async () => {
+    await grupoCom('ESS-G3', ['Carla', 'Pedro']);
+
+    const resposta = await request(app).post('/api/grupos').send({ nome: 'ESS-G8', alunos: ['Ana', 'Carla'] }).expect(400);
+
+    expect(resposta.body.error).toBe('Carla is already in group ESS-G3');
+    expect(await grupo('ESS-G8')).toBeUndefined();
   });
 });
