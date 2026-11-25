@@ -16,7 +16,7 @@ describe('ConfiguracaoLembretes', () => {
       new Lembrete(primeiro), new Lembrete(segundo)
     ]);
     const anterior = configuracao.toJSON();
-    const [copia] = configuracao.buscarLembretesPara(primeiro.data, primeiro.horario);
+    const [copia] = configuracao.buscarLembretesPorDataEHorario(primeiro.data, primeiro.horario);
 
     configuracao.marcarComoEnviado(primeiro.id);
 
@@ -138,8 +138,8 @@ describe('ConfiguracaoLembretes', () => {
     expect(configuracao.listar()).toEqual([new Lembrete(primeiro)]);
 
     configuracao.atualizar(2, [primeiro, { ...primeiro, id: 'outro' }], instanteAtual, prazo);
-    expect(configuracao.buscarLembretesPara(primeiro.data, primeiro.horario)).toHaveLength(2);
-    expect(configuracao.buscarLembretesPara('2026-08-26', primeiro.horario)).toEqual([]);
+    expect(configuracao.buscarLembretesPorDataEHorario(primeiro.data, primeiro.horario)).toHaveLength(2);
+    expect(configuracao.buscarLembretesPorDataEHorario('2026-08-26', primeiro.horario)).toEqual([]);
   });
 
   test('não permite remover enviado usando outro objeto com o mesmo id e estado pendente', () => { // A proteção usa o estado armazenado, não o informado no argumento da remoção.

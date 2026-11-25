@@ -76,6 +76,7 @@ namespace Servidor {
     semester
     obterPeriodoAcademico() PeriodoAcademico
     obterConfiguracaoLembretes() ConfiguracaoLembretes
+    buscarLembretesPorDataEHorario(data, horario) Lembrete[]
     identificarPendencias()
   }
   class PeriodoAcademico {
@@ -114,7 +115,7 @@ namespace Servidor {
     cancelar(id, motivo)
     atualizar(quantidade, lembretesPropostos, instanteAtual, prazoAcademico)
     possuiAgendamentosPendentesApos(novoPrazo) boolean
-    buscarLembretesPara(data, horario) Lembrete[]
+    buscarLembretesPorDataEHorario(data, horario) Lembrete[]
     listar() Lembrete[]
   }
   class Lembrete {
@@ -289,14 +290,14 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Não criar o novo Lembrete, não solicitar email e não registrar uma tentativa de envio.
 %% Esta regra de criação não define novas restrições para propostas sem novos lembretes.
 
-%% BUSCA POR AGENDAMENTO: buscarLembretesPara é uma consulta da ConfiguracaoLembretes da turma.
-%% Retornar todos os Lembretes cuja data e horário correspondem aos parâmetros, ou uma lista vazia.
+%% BUSCA POR AGENDAMENTO: Class.buscarLembretesPorDataEHorario delega a consulta à ConfiguracaoLembretes da turma.
+%% Retornar cópias dos Lembretes com a data e o horário originais informados, ou uma lista vazia.
 %% Preservar objetos, estados e histórico; não criar lembrete, não enviar email e não consultar o relógio.
 %% Não impor unicidade de data e horário nem filtrar ou unificar estados Não enviado, Agendado e Enviado.
 %% Lembretes de outras configurações não participam da consulta.
 
 %% ENTRADA POR AGENDAMENTO: processarAgendados usa a turma indicada, acessível por Classes,
-%% e consulta sua ConfiguracaoLembretes por buscarLembretesPara(data, horario).
+%% e chama buscarLembretesPorDataEHorario(data, horario) diretamente na turma.
 %% NotificacaoService verifica os agendamentos ao iniciar e a cada 30 segundos.
 %% Cada instância do serviço mantém um único intervalo e executa uma verificação por vez.
 %% processarLembretesAteAgora seleciona os horários alcançados. O envio continua sujeito ao prazo acadêmico.
@@ -381,7 +382,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Ao passar para Enviado, a operação também esvazia proximoReenvioEm, retirando o reenvio pendente.
 %% Preservar motivo, id, data e horário; não enviar email, registrar Notificacao ou programar outro reenvio.
 %% ConfiguracaoLembretes.marcarComoEnviado(id) localiza o lembrete armazenado e delega a transição à entidade.
-%% A marcação atualiza o registro da turma. listar e buscarLembretesPara devolvem cópias para consulta.
+%% A marcação atualiza o registro da turma. listar e buscarLembretesPorDataEHorario devolvem cópias para consulta.
 %% Após aceitação do email, NotificacaoService coordena registrar uma nova Notificacao Enviado
 %% e chamar marcarComoEnviado no mesmo Lembrete.
 %% Se uma tentativa válida falhar, o serviço coordena registrar uma nova Notificacao Falha,

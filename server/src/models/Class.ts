@@ -2,6 +2,7 @@ import { Student } from './Student';
 import { Enrollment } from './Enrollment';
 import { EspecificacaoDoCalculoDaMedia } from './EspecificacaoDoCalculoDaMedia';
 import { ConfiguracaoLembretes } from './ConfiguracaoLembretes';
+import type { Lembrete } from './Lembrete';
 import { PeriodoAcademico } from './PeriodoAcademico';
 import { EVALUATION_GOALS } from './Evaluation';
 
@@ -38,6 +39,10 @@ export class Class {
 
   obterConfiguracaoLembretes(): ConfiguracaoLembretes {
     return this.configuracaoLembretes; // Permite acessar os lembretes da turma pelas operações da configuração.
+  }
+
+  buscarLembretesPorDataEHorario(data: string, horario: string): Lembrete[] {
+    return this.configuracaoLembretes.buscarLembretesPorDataEHorario(data, horario);
   }
 
   getPrazoAcademico(): Date | null {

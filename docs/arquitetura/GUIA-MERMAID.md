@@ -361,17 +361,17 @@ Prazo acadêmico encerrado; cancelar não remove o lembrete nem altera o histór
 
 ### Localização dos lembretes por agendamento
 
-`ConfiguracaoLembretes.buscarLembretesPara(data, horario)` retorna uma lista dos
-lembretes com exatamente aquela data e horário, restrita à configuração consultada.
+`Class.buscarLembretesPorDataEHorario(data, horario)` delega a busca à configuração
+da turma. A configuração retorna cópias dos lembretes com a data e o horário
+originais informados.
 É uma consulta: preserva objetos, estados e histórico, sem criar lembrete ou
 solicitar email. A lista pode estar vazia ou conter vários lembretes; não foi
 definida uma regra de exclusividade de data e horário. A busca não filtra estados
 nem unifica `Não enviado` com `Agendado`.
 
 `NotificaçãoService.processarAgendados(turma, data, horario)` é a entrada conceitual
-para uma solicitação por turma e agendamento. Pelas associações existentes com
-`Classes`, suas turmas e configurações, o serviço acessa a configuração da turma
-indicada e realiza a consulta. Não é necessário acrescentar relações ao diagrama.
+para uma solicitação por turma e agendamento. O serviço localiza a turma em
+`Classes` e chama `buscarLembretesPorDataEHorario(data, horario)` na própria turma.
 
 | Resultado da busca | Coordenação esperada |
 | --- | --- |

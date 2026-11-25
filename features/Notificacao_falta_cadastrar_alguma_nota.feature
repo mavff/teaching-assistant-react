@@ -352,7 +352,7 @@ Feature: Notificações de pendências no lançamento de notas
 
 
    @service
-   # DDD (regra central representada): processarAgendados consulta buscarLembretesPara na configuração da turma; lista vazia rejeita a solicitação sem email ou tentativa, preservando prazo, lembretes e histórico.
+   # DDD (regra central representada): processarAgendados consulta a turma com buscarLembretesPorDataEHorario. Uma lista vazia rejeita a solicitação sem email ou tentativa, preservando prazo, lembretes e histórico.
    # Validação: completa (Jest, NotificacaoService.test.ts).
    Scenario: Bloqueio de envio de lembrete não agendado
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
