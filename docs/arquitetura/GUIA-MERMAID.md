@@ -184,7 +184,7 @@ primeiro discuta com a equipe como cada informação deve ser representada.
 
 Um caminho de setas não prova que o cenário funciona. A análise do diagrama é
 conceitual; os testes da futura implementação precisam comprovar suas regras.
-O acompanhamento dos 25 cenários de lembretes está em
+O acompanhamento dos 24 cenários de lembretes está em
 [COBERTURA-CENARIOS.md](COBERTURA-CENARIOS.md), separando regras representadas,
 lacunas e resultados de descoberta dos testes.
 Esses cenários e suas marcações orientam a avaliação de completude do DDD desta
@@ -311,7 +311,7 @@ o relógio e não envia email. Somente `PeriodoAcademico` é acrescentado como e
 mantém a consulta dos seus próprios lembretes. `Services` coordena a operação,
 sem armazenar uma cópia do prazo em cada turma.
 
-Este incremento registra decisões de domínio aprovadas. Os 25 cenários atuais,
+Este incremento registra decisões de domínio aprovadas. Os 24 cenários atuais,
 seus comentários e a matriz de cobertura ainda precisam ser adequados ao prazo
 compartilhado; não são alterados nem considerados evidência dessa nova regra.
 Os testes unitários existentes de `Class` e JSON verificam a implementação

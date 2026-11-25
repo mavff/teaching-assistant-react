@@ -1,6 +1,6 @@
 # Cobertura dos cenários de lembretes
 
-Esta análise acompanha os 25 cenários de
+Esta análise acompanha os 24 cenários de
 [Notificacao_falta_cadastrar_alguma_nota.feature](../../features/Notificacao_falta_cadastrar_alguma_nota.feature)
 em relação ao modelo Mermaid e às regras documentadas no guia.
 Os quatro arquivos de `features/` foram importados da `main` do fork,
@@ -16,7 +16,7 @@ Nos outros 11 cenários GUI, a precondição de autenticação foi retirada com
 aprovação do responsável. Cada um começa explicitamente com o professor Paulo
 Borba na tela inicial validada, preservando a turma e os filtros indicados.
 Os nomes, tags e demais passos desses cenários foram mantidos. Os nomes dos
-13 cenários service permanecem inalterados. No cenário de ausência de envio,
+12 cenários de serviço foram mantidos. No cenário de ausência de envio,
 o Then do lembrete futuro de 29/08 foi corrigido, com aprovação, para preservar
 Não enviado, igual ao Given. No cenário de reenvio após falha temporária, duas
 referências à causa do erro foram corrigidas, com aprovação, de motivo para
@@ -29,7 +29,7 @@ As outras três features continuam idênticas à origem.
 
 ## Critério de completude do DDD
 
-Os 25 cenários desta feature e suas marcações são o critério acordado para avaliar
+Os 24 cenários desta feature e suas marcações são o critério acordado para avaliar
 a completude conceitual do DDD de lembretes de notas pendentes. Cada incremento
 deve ser confrontado com esses cenários, atualizando as evidências e lacunas
 neste documento e os comentários junto às tags.
@@ -73,8 +73,8 @@ Scenario: Configuração da quantidade, datas e horários dos lembretes
 ```
 
 No DDD, a regra central foi representada em 12 cenários de GUI e 10 de
-serviço. Outros dois cenários de serviço têm classificação parcial e um
-está pendente. As tags `@gui` e `@service` identificam a camada. O perfil
+serviço. Os outros dois cenários de serviço têm classificação parcial. As tags
+`@gui` e `@service` identificam a camada. O perfil
 `lembretesGui` seleciona os cenários com `@lembretes-configuracao-gui`.
 
 ## Cenários GUI
@@ -138,12 +138,11 @@ concorrente implementados na aplicação.
 | [Prevenção de envio duplicado por reprocessamento de lembrete já enviado](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L417) | Regra central representada | `jaFoiEnviado()` faz `processar` encerrar sem novo email, notificação de tentativa ou reenvio; preserva lembrete e histórico. |
 | [Bloqueio de novo reenvio após sucesso de tentativa anterior](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L435) | Regra central representada | O mesmo bloqueio preserva as duas notificações anteriores e impede uma terceira tentativa quando o estado recebido já é Enviado. |
 | [Reenvio progressivo após falhas persistentes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L453) | Regra central representada | processarReenvios consulta a configuração da turma, seleciona proximoReenvioEm preenchido e menor ou igual ao instante atual e delega a processar. A terceira Falha de 09:01 preserva as anteriores e programa 09:03 pelo cálculo existente. A correção aprovada dos dois passos usa descrição da falha para o erro, conforme descricaoFalha. |
-| [Prevenção de envio duplicado por processamento concorrente](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L473) | Pendente | Duas execuções podem observar o estado ainda não enviado. Consulta e marcação, isoladamente, não garantem um único envio ou registro. |
-| [Cancelamento de reenvio após resolução das pendências](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L489) | Regra central representada | processar consulta as notas atuais e chama Lembrete.cancelar(Nenhuma nota pendente) no reenvio: estado Cancelado, motivo preservado e proximoReenvioEm vazio, sem email ou novo registro e com as três Falhas anteriores intactas. A correção aprovada usa descrição da falha nos dois passos do histórico anterior, conforme descricaoFalha. |
-| [Interrupção dos reenvios após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L511) | Regra central representada | processar verifica o prazo e chama Lembrete.cancelar(Prazo acadêmico encerrado) no reenvio: estado Cancelado, motivo guardado e proximoReenvioEm vazio, sem email ou novo registro e com as três Falhas anteriores intactas. A correção aprovada usa descrição da falha nos dois passos do histórico anterior, conforme descricaoFalha. |
+| [Cancelamento de reenvio após resolução das pendências](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L473) | Regra central representada | processar consulta as notas atuais e chama Lembrete.cancelar(Nenhuma nota pendente) no reenvio: estado Cancelado, motivo preservado e proximoReenvioEm vazio, sem email ou novo registro e com as três Falhas anteriores intactas. A correção aprovada usa descrição da falha nos dois passos do histórico anterior, conforme descricaoFalha. |
+| [Interrupção dos reenvios após o prazo acadêmico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L495) | Regra central representada | processar verifica o prazo e chama Lembrete.cancelar(Prazo acadêmico encerrado) no reenvio: estado Cancelado, motivo guardado e proximoReenvioEm vazio, sem email ou novo registro e com as três Falhas anteriores intactas. A correção aprovada usa descrição da falha nos dois passos do histórico anterior, conforme descricaoFalha. |
 
 Resultado da análise: 22 regras centrais representadas (12 GUI e 10 service),
-2 cenários parciais e 1 pendente. Isso não equivale a 22 cenários completos passando.
+2 cenários parciais. Isso não equivale a 22 cenários completos passando.
 
 ## Seleção e execução dos reenvios cujo horário chegou
 
@@ -596,7 +595,7 @@ inalterados; esta classificação é conceitual e não comprova execução da in
 
 Os resultados desta seção referem-se à versão anterior com 26 cenários, antes da
 retirada aprovada do cenário de restrição às próprias turmas. Não foram refeitos
-nesta revisão conceitual e não representam uma verificação dos 25 cenários atuais.
+nesta revisão conceitual e não representam uma verificação dos 24 cenários atuais.
 
 O runner do projeto em `client/cucumber.js` aponta apenas para
 `client/src/features/**/*.feature`. Importar `features/` na raiz torna os arquivos

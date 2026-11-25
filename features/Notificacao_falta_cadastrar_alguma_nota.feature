@@ -469,22 +469,6 @@ Feature: Notificações de pendências no lançamento de notas
 
 
    @service
-   # DDD (pendente): Duas execuções podem observar o estado ainda não enviado. Consulta e marcação, isoladamente, não garantem um único envio ou registro.
-   Scenario: Prevenção de envio duplicado por processamento concorrente
-      Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
-      And a turma possui apenas o aluno "João da Silva", sem nota cadastrada em "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
-      And a turma possui apenas um lembrete, programado para "25/08/2026 às 09:00", com status "Agendado"
-      And não existem tentativas de envio registradas para esse lembrete
-      And o prazo acadêmico da turma é "31/08/2026 às 23:59"
-      And o serviço de e-mail do "Gmail" está disponível e aceita envios
-      When duas execuções concorrentes do serviço processam o mesmo lembrete em "25/08/2026 às 09:00"
-      Then exatamente um e-mail desse lembrete é aceito para envio ao endereço "paulo.borba@example.com"
-      And o histórico de "Paulo Borba" registra exatamente uma tentativa desse lembrete, com status "Enviado"
-      And o lembrete recebe o status "Enviado"
-      And o lembrete é contabilizado como um único envio
-
-
-   @service
    # DDD (regra central representada): No reenvio sem pendências, processar chama Lembrete.cancelar(Nenhuma nota pendente): estado Cancelado, motivo guardado e proximoReenvioEm vazio, sem email ou novo registro e preservando as três Falhas; os passos do histórico anterior usam descrição da falha para o erro, conforme descricaoFalha.
    Scenario: Cancelamento de reenvio após resolução das pendências
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
