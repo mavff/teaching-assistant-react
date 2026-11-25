@@ -251,6 +251,57 @@ describe('Lembretes automáticos no servidor', () => {
     expect(reiniciado.send).not.toHaveBeenCalled();
   });
 
+  test('cancela o quarto envio após o prazo acadêmico e recupera o cancelamento ao reiniciar', async () => {
+    jest.setSystemTime(new Date('2026-08-31T23:57:30-03:00')); // Given: a primeira rodada após o cadastro será às 23:58.
+    prepararDados(); // Given: prazo às 23:59 e nota de Design pendente.
+    const inicial = iniciar();
+    const lembreteDoCenario = { ...lembrete, data: '2026-09-01', horario: '02:58' }; // 31/08 às 23:58 em Brasília.
+    const descricaoFalha = 'Indisponibilidade temporária do serviço de e-mail';
+    inicial.send.mockResolvedValue({ aceito: false, descricaoFalha });
+
+    await request(inicial.app).put(rota).send({
+      quantidade: 1, lembretes: [lembreteDoCenario]
+    }).expect(200);
+
+    await jest.advanceTimersByTimeAsync(119_999); // Given: chega a 1 ms do quarto envio.
+    const historicoAntes = resumoDoHistorico(inicial);
+    expect(historicoAntes).toEqual([
+      '2026-09-01T02:58:00.000Z',
+      '2026-09-01T02:58:15.000Z',
+      '2026-09-01T02:58:45.000Z'
+    ].map(dataHora => expect.objectContaining({
+      lembreteId: lembreteDoCenario.id, resultado: 'Falha', descricaoFalha, dataHora
+    }))); // Given: o agendador produziu as três falhas nos horários esperados.
+    const turma = inicial.classes.findClassById('ESS-2026-2');
+    expect(turma?.identificarPendencias()).toEqual([
+      expect.objectContaining({ meta: 'Design' })
+    ]); // Given: a nota continua pendente quando o prazo termina.
+    const aguardando = await request(inicial.app).get(rota).expect(200);
+    expect(aguardando.body.lembretes[0].proximoReenvioEm)
+      .toBe('2026-09-01T02:59:30.000Z'); // Given: o quarto envio ainda está programado.
+
+    await jest.advanceTimersByTimeAsync(1); // When: o agendador processa o reenvio às 23:59:30 em Brasília.
+
+    expect(inicial.send).toHaveBeenCalledTimes(3); // Then: o quarto envio não chegou ao transporte.
+    expect(resumoDoHistorico(inicial)).toEqual(historicoAntes); // Then: preserva as três falhas.
+    const cancelado = {
+      ...lembreteDoCenario,
+      estado: 'Cancelado',
+      motivo: 'Prazo acadêmico encerrado',
+      proximoReenvioEm: null
+    };
+    const consulta = await request(inicial.app).get(rota).expect(200);
+    expect(consulta.body.lembretes).toEqual([cancelado]); // Then: o lembrete fica cancelado e sem reenvio.
+
+    inicial.parar();
+    const reiniciado = iniciar();
+    await jest.advanceTimersByTimeAsync(30_000);
+    const recuperado = await request(reiniciado.app).get(rota).expect(200);
+    expect(recuperado.body.lembretes).toEqual([cancelado]); // Confirma que o cancelamento voltou do JSON.
+    expect(resumoDoHistorico(reiniciado)).toEqual(historicoAntes);
+    expect(reiniciado.send).not.toHaveBeenCalled();
+  });
+
   test('tenta gravar novamente sem repetir o envio', async () => {
     // Given: o lembrete foi salvo e a próxima substituição do arquivo falhará.
     prepararDados();
