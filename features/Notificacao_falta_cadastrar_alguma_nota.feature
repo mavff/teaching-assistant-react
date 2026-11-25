@@ -374,6 +374,7 @@ Feature: Notificações de pendências no lançamento de notas
 
    @service
    # DDD (regra central representada): Class.prazoEncerrado verifica o instante do serviço; configurarLembretes rejeita criação com o motivo Prazo acadêmico encerrado, sem alterar configuração, enviados ou histórico nem solicitar email.
+   # Validação: completa (Jest, ConfiguracaoLembretesApi.test.ts).
    Scenario: Bloqueio de criação de novo lembrete após o prazo acadêmico
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui o aluno matriculado "João da Silva", sem nota cadastrada em "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
