@@ -471,6 +471,7 @@ Feature: Notificações de pendências no lançamento de notas
 
    @service
    # DDD (regra central representada): No reenvio sem pendências, processar chama Lembrete.cancelar(Nenhuma nota pendente): estado Cancelado, motivo guardado e proximoReenvioEm vazio, sem email ou novo registro e preservando as três Falhas; os passos do histórico anterior usam descrição da falha para o erro, conforme descricaoFalha.
+   # Validação: completa (Jest, LembretesAutomaticos.test.ts).
    Scenario: Cancelamento de reenvio após resolução das pendências
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
