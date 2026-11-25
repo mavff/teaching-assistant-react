@@ -695,22 +695,18 @@ O cenário **Visualização do histórico de notificações** considera um únic
 professor utilizando a funcionalidade, com suas turmas disponíveis. Seu ponto
 inicial é a tela Turmas, sem autenticação ou registros de outros professores.
 
-`HistoricoNotificacoes.listar()` retorna as notificações registradas, incluindo
-Enviado, Falha e Ignorado. Consultas de tentativas consideram apenas Enviado e
-Falha; o registro Ignorado não é contado como tentativa. `Services.consultarHistorico()`, já presente no diagrama,
-coordena essa operação pela associação com `HistoricoNotificacoes`. A composição
-com `Notificacao` representa os registros que fornecem nome do destinatário,
-turma, data/hora, motivo e resultado para apresentação.
+`HistoricoNotificacoes.listar()` retorna os registros Enviado, Falha e Ignorado.
+Enviado e Falha representam tentativas de envio. A rota `GET /api/notificacoes/historico`
+consulta `HistoricoNotificacoes.listar()` no histórico de lembretes. A tabela mostra
+os registros Enviado, Falha e Ignorado, com a turma e os dados registrados na época.
 
 A consulta preserva todos os registros, seus identificadores e estados. Não
 solicita email, executa reenvio ou recalcula os dados históricos a partir da turma
 atual. A filtragem, as pendências históricas e o prazo registrado nos detalhes
 são descritos a seguir.
 
-Os métodos de apresentação e navegação do cliente não são necessários para
-esta validação de domínio. Conforme aprovado, as classes do cliente, Email Service,
-Interface e suas ligações permanecem inalteradas. O método `listar()` fica visível
-na classe responsável do servidor, com as relações de acesso já existentes.
+A aba do cliente consulta a API ao abrir e mostra a data e hora no fuso de Brasília,
+do registro mais recente para o mais antigo.
 
 ### Filtragem por disciplina e turma com os dados existentes
 

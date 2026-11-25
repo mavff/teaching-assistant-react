@@ -1,0 +1,60 @@
+import request from 'supertest';
+import { app, historicoLembretes, services } from '../server';
+import { Notificacao } from '../models/Notificacao';
+
+describe('API do histórico de notificações', () => {
+  const rota = '/api/notificacoes/historico';
+
+  afterEach(() => {
+    historicoLembretes.limpar();
+    services.historico.limpar();
+  });
+
+  test('lista todos os registros do agendador em ordem de data e id', async () => {
+    const registros = [
+      { id: 1, contexto: '2026.2 de ESS', dataHora: '2026-08-25T12:00:00.000Z',
+        motivo: 'Notas pendentes', resultado: 'Falha' },
+      { id: 2, contexto: '2026.2 de Introdução a Programação', dataHora: '2026-08-27T12:00:00.000Z',
+        motivo: 'Notas pendentes', resultado: 'Falha' },
+      { id: 3, contexto: '2026.2 de ESS', dataHora: '2026-08-27T12:00:00.000Z',
+        motivo: 'Nenhuma nota pendente', resultado: 'Ignorado' },
+      { id: 4, contexto: '2026.2 de ESS', dataHora: '2026-08-28T12:00:00.000Z',
+        motivo: 'Notas pendentes', resultado: 'Enviado' }
+    ] as const;
+
+    for (const registro of registros) {
+      historicoLembretes.registrar(new Notificacao(
+        registro.id,
+        'professor@example.test',
+        {
+          lembreteId: `lembrete-${registro.id}`,
+          turmaRegistrada: registro.contexto,
+          prazoRegistrado: new Date('2026-09-01T02:59:00Z'),
+          pendenciasRegistradas: []
+        },
+        new Date(registro.dataHora),
+        registro.resultado,
+        registro.motivo
+      )); // Given: inclui horários iguais e um Enviado mais recente.
+    }
+
+    const resposta = await request(app).get(rota).expect(200); // When: consulta a listagem.
+    expect(resposta.body).toEqual([
+      { ...registros[3], origem: 'lembrete' }, // Enviado é o registro mais recente.
+      { ...registros[2], origem: 'lembrete' },
+      { ...registros[1], origem: 'lembrete' },
+      { ...registros[0], origem: 'lembrete' }
+    ]); // Then: confere os campos, os status exibidos, a ordem e o desempate.
+    expect(historicoLembretes.listar().map(({ id }) => id)).toEqual([1, 2, 3, 4]); // A leitura preserva a fonte.
+  });
+
+  test('devolve lista vazia quando só existe uma falha no fluxo de grupos', async () => {
+    services.historico.registrar(new Notificacao(
+      1, 'monitor@example.test', 'Grupo A', new Date('2026-08-28T12:00:00Z'),
+      'Falha', 'Alocação de monitor'
+    )); // Given: o único registro é de outra origem.
+
+    const resposta = await request(app).get(rota).expect(200);
+    expect(resposta.body).toEqual([]); // Then: nesta entrega, a aba lista lembretes.
+  });
+});

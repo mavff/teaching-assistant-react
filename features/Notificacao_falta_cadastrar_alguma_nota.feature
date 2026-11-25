@@ -16,20 +16,20 @@ Feature: Notificações de pendências no lançamento de notas
 
    # Cenários de GUI
 
-   
    @gui
-   # DDD (regra central representada): Services.consultarHistorico usa HistoricoNotificacoes.listar e devolve turma, dataHora, motivo e resultado registrados no histórico do único professor, preservando as notificações.
+   # DDD (regra central representada): GET /api/notificacoes/historico devolve os registros Enviado, Falha e Ignorado do agendador de lembretes.
+   # Validação: completa (Chrome/Cucumber, perfil historicoGui).
    Scenario: Visualização do histórico de notificações
-      Given o professor "Paulo Borba" está na tela "Turmas"
-      And existe uma notificação de "Paulo Borba" para a turma "2026.2 de ESS", em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And existe uma notificação de "Paulo Borba" para a turma "2026.2 de Introdução a Programação", em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
-      When "Paulo Borba" acessa a tela "Histórico de notificações"
-      Then "Paulo Borba" é direcionado à tela "Histórico de notificações"
-      And é apresentada a notificação de "Paulo Borba" da turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And é apresentada a notificação de "Paulo Borba" da turma "2026.2 de Introdução a Programação", registrada em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
+      Given o professor está na tela "Turmas"
+      And existe uma notificação para a turma "2026.2 de ESS", em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
+      And existe uma notificação para a turma "2026.2 de ESS", em "26/08/2026 às 10:00", com motivo "Nenhuma nota pendente" e status "Ignorado"
+      And existe uma notificação para a turma "2026.2 de Introdução a Programação", em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
+      When o professor acessa a tela "Histórico de notificações"
+      Then a tela "Histórico de notificações" é exibida
+      And é apresentada a notificação da turma "2026.2 de Introdução a Programação", registrada em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
+      And é apresentada a notificação da turma "2026.2 de ESS", registrada em "26/08/2026 às 10:00", com motivo "Nenhuma nota pendente" e status "Ignorado"
+      And é apresentada a notificação da turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
 
-
-  
    @gui
    # DDD (regra central representada): A consulta por id devolve pendenciasRegistradas e prazoRegistrado da tentativa; o prazo é copiado da Class ao registrar a notificação e a lista permanece igual após o cadastro das notas.
    Scenario: Visualização dos detalhes históricos de uma notificação

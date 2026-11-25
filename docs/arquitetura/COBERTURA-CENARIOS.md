@@ -90,8 +90,9 @@ e retorna a confirmação de sucesso ou o motivo da rejeição definido nos cen�
 Navegação, mensagens visuais e persistência não são
 validadas por essa classificação. Conforme a simplificação acordada, a funcionalidade
 é utilizada por um único professor, com suas turmas disponíveis, sem autenticação
-ou controle de acesso entre professores. A listagem coordena consultarHistorico
-e listar pelas relações existentes do servidor. A consulta de uma falha considera
+ou controle de acesso entre professores. A rota `GET /api/notificacoes/historico`
+consulta diretamente `HistoricoNotificacoes.listar()` no histórico de lembretes.
+A consulta de uma falha considera
 o registro já fornecido no Given e sua seleção por id; os dados de destinatário e
 turma são obtidos do próprio registro histórico. A filtragem combina disciplina e
 turma usando a identificação já existente em turmaRegistrada. As pendências históricas
@@ -105,7 +106,7 @@ prevista no respectivo cenário.
 
 | Cenário | Tela inicial aprovada | Cobertura conceitual | Evidência e lacuna |
 | --- | --- | --- | --- |
-| [Visualização do histórico de notificações](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L22) | Turmas | Regra central representada | Services.consultarHistorico coordena HistoricoNotificacoes.listar pela associação existente; a composição com Notificacao fornece as duas tentativas e seus dados registrados, sem seleção entre professores ou alteração do histórico. |
+| [Visualização do histórico de notificações](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L22) | Turmas | Regra central representada | A rota `GET /api/notificacoes/historico` consulta diretamente `HistoricoNotificacoes.listar()` no histórico de lembretes. A tabela mostra os registros Enviado, Falha e Ignorado, com a turma e os dados registrados na época. Validado em Chrome/Cucumber (perfil historicoGui). |
 | [Visualização dos detalhes históricos de uma notificação](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L35) | Histórico de notificações | Regra central representada | Services.consultarDetalhesNotificacao usa buscar(idNotificacao) e devolve os dados da tentativa, incluindo pendenciasRegistradas e prazoRegistrado. NotificacaoService copia o prazo da Class ao compor o registro, pelas relações existentes. O cadastro posterior das notas preserva as pendências históricas. |
 | [Filtragem do próprio histórico por disciplina e turma](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L49) | Histórico de notificações — sem filtros aplicados | Regra central representada | Services.filtrarHistorico coordena HistoricoNotificacoes.filtrar pelas relações existentes; turmaRegistrada já identifica disciplina e turma. A seleção combina os dois critérios, exclui ESS de outro semestre e outras disciplinas do resultado e preserva todos os registros. |
 | [Visualização de uma falha no próprio histórico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L65) | Histórico de notificações | Regra central representada | consultarDetalhesNotificacao usa buscar(idNotificacao) e devolve nomeDestinatario, turmaRegistrada, dataHora, motivo, resultado e descricaoFalha do registro selecionado, preservando a falha original e todos os dados. |
@@ -513,21 +514,17 @@ consideram os dados do Given, sem modelar autenticação, RBAC ou a navegação 
 - **Contexto aprovado:** um único professor utiliza a funcionalidade com suas turmas
   disponíveis. O cenário começa na tela Turmas e não exige autenticação nem seleção
   de notificações entre professores.
-- **Métodos e relações:** Services.consultarHistorico acessa HistoricoNotificacoes
-  pela seta já existente e coordena listar. A composição com Notificacao fornece
-  os registros do histórico. listar está visível na classe do servidor; cliente,
-  Email Service, Interface e suas relações permanecem inalterados.
-- **Dados apresentados:** retornar a tentativa da turma 2026.2 de ESS, em
-  25/08/2026 às 09:00, com motivo Notas pendentes e resultado Enviado, e a da turma
-  2026.2 de Introdução a Programação, em 27/08/2026 às 09:00, com o mesmo motivo
-  e resultado Falha. Os dados são os registrados nas respectivas notificações.
+- **Métodos e relações:** a rota `GET /api/notificacoes/historico` consulta
+  `HistoricoNotificacoes.listar()` no histórico de lembretes.
+- **Dados apresentados:** a tabela lista Enviado, Falha e Ignorado do registro
+  mais recente ao mais antigo. No cenário, aparecem Falha para 2026.2 de Introdução
+  a Programação às 09:00 de 27/08/2026, Ignorado para 2026.2 de ESS às 10:00
+  de 26/08/2026 e Enviado para 2026.2 de ESS às 09:00 de 25/08/2026.
 - **Preservação:** a consulta mantém todos os registros, seus identificadores e
   estados, sem solicitar email ou reenvio.
 
-A regra central do cenário de listagem passa de Parcial para representada.
-Esta é uma validação conceitual do domínio; não acrescenta métodos de navegação
-às classes do cliente. A filtragem, as pendências históricas e o prazo registrado
-nos detalhes são descritos a seguir.
+A aba Histórico de notificações parte da tela Turmas. A filtragem, as pendências
+históricas e o prazo registrado nos detalhes são descritos a seguir.
 
 ## Percurso da filtragem do histórico
 

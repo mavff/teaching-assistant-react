@@ -551,9 +551,12 @@ HistoricoNotificacoes <-- NotificacaoService
 %% HistoricoNotificacoes.listar retorna as Notificacoes registradas, com resultados Enviado, Falha e Ignorado.
 %% Consultas de tentativas de envio consideram somente resultados Enviado e Falha, sem incluir Ignorado na contagem ou na última tentativa.
 %% No cenário de ausência de envio, o registro Ignorado de 25/08 fica no histórico, mas a última tentativa continua Enviado de 20/08.
-%% Services.consultarHistorico coordena listar pela associação Services --> HistoricoNotificacoes.
+%% GET /api/notificacoes/historico lê o histórico de lembretes com HistoricoNotificacoes.listar().
+%% Services.consultarHistorico consulta o histórico de grupos.
 %% A composição HistoricoNotificacoes *--> Notificacao representa os registros devolvidos.
-%% A listagem disponibiliza nomeDestinatario, turmaRegistrada, dataHora, motivo e resultado registrados.
+%% A listagem apresenta os registros Enviado, Falha e Ignorado do agendador de lembretes.
+%% Cada linha da listagem identifica a origem do registro.
+%% Nos lembretes, o contexto apresentado é a turmaRegistrada.
 %% Preservar os ids, estados e todos os dados das notificações; consultar não envia email nem executa reenvio.
 %% Não selecionar por professor nem acrescentar sua entidade, identificador, autenticação ou controle de acesso.
 %% As classes do cliente, EmailService, Interface e suas relações permanecem inalteradas.

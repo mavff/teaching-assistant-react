@@ -299,6 +299,28 @@ app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
   }
 });
 
+app.get('/api/notificacoes/historico', (_req: Request, res: Response) => {
+  const registros = historicoLembretes.listar()
+    .sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime() || b.id - a.id)
+    .flatMap(({ id, turmaRegistrada, dataHora, motivo, resultado }) => {
+      // A aba apresenta todos os resultados registrados pelo agendador da turma.
+      if (turmaRegistrada === null) {
+        return [];
+      }
+
+      return [{
+        id,
+        origem: 'lembrete',
+        contexto: turmaRegistrada,
+        dataHora: dataHora.toISOString(),
+        motivo,
+        resultado
+      }];
+    });
+
+  res.json(registros);
+});
+
 const apresentarConfiguracaoLembretes = (turma: Class) => ({
   turmaId: turma.getClassId(),
   prazoAcademico: turma.getPrazoAcademico()?.toISOString() ?? null,
