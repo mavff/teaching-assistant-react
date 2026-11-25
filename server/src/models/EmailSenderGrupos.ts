@@ -15,6 +15,7 @@ export const ENVIO_REAL_GRUPOS = 'smtp';
 export class EmailSenderGrupos {
   private smtp: Pick<EmailSenderSmtp, 'send'> | undefined;
   private readonly simulado = new EmailSenderSimulado();
+  private simuladoForcado = false;
 
   constructor(
     private readonly ambiente: NodeJS.ProcessEnv = process.env,
@@ -22,7 +23,12 @@ export class EmailSenderGrupos {
   ) {}
 
   usaEnvioReal(): boolean {
-    return this.ambiente.NOTIFICACOES_GRUPO_EMAIL === ENVIO_REAL_GRUPOS;
+    return !this.simuladoForcado && this.ambiente.NOTIFICACOES_GRUPO_EMAIL === ENVIO_REAL_GRUPOS;
+  }
+
+  /** Passa a simular todos os envios até o servidor reiniciar (usado pelos testes de aceitação). */
+  forcarSimulado(): void {
+    this.simuladoForcado = true;
   }
 
   async send(destinatario: string, assunto: string, conteudo: string): Promise<ResultadoEnvio> {

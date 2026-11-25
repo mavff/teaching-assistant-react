@@ -107,6 +107,7 @@ export function grupoRoutes(services: Services): Router {
   // Endpoints used only by the automated tests to isolate scenarios
   if (process.env.NODE_ENV !== 'production') {
     router.post('/test/reset', (req, res) => {
+      services.forcarEnvioSimulado(); // os cenários usam endereços inventados: nunca enviar de verdade
       services.grupos.limpar();
       services.monitores.limpar();
       services.historico.limpar();
