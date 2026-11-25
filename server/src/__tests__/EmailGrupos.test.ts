@@ -51,6 +51,33 @@ describe('EmailSenderGrupos', () => {
   });
 });
 
+describe('Proteção dos testes de aceitação contra o envio real', () => {
+  it('simula os envios depois de forcarSimulado, mesmo com NOTIFICACOES_GRUPO_EMAIL=smtp', async () => {
+    const smtp = remetenteFalso();
+    const remetente = new EmailSenderGrupos({ NOTIFICACOES_GRUPO_EMAIL: 'smtp' }, () => smtp);
+
+    remetente.forcarSimulado();
+
+    expect(remetente.usaEnvioReal()).toBe(false);
+    expect(await remetente.send('joao@cin.ufpe.br', 'Assunto', 'Texto')).toEqual({ aceito: true });
+    expect(smtp.enviados).toEqual([]);
+  });
+
+  it('Services.forcarEnvioSimulado impede o envio real das notificações de grupo', async () => {
+    const smtp = remetenteFalso();
+    const remetente = new EmailSenderGrupos({ NOTIFICACOES_GRUPO_EMAIL: 'smtp' }, () => smtp);
+    const services = new Services(new Grupos(), new Monitores(), new HistoricoNotificacoes(), remetente);
+    services.cadastrarMonitor('joaosilva', 'João Silva', 'joao@cin.ufpe.br');
+    services.criarGrupo('ESS-G3', []);
+
+    services.forcarEnvioSimulado();
+    await services.alocarMonitor('ESS-G3', 'joaosilva');
+
+    expect(smtp.enviados).toEqual([]);
+    expect(services.consultarHistorico()[0].resultado).toBe('Enviado');
+  });
+});
+
 describe('Endereço de e-mail das notificações de grupo', () => {
   const emails: Record<string, string> = { Mariana: 'mariana@cin.ufpe.br', Pedro: '' };
 

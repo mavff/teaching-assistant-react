@@ -35,6 +35,7 @@ export class Services {
   readonly notificacaoService: NotificacaoService;
   readonly gradeNotificationService: GradeNotification;
   readonly gradeNotificationSender: EmailSender | Pick<EmailSenderSmtp, 'send'>;
+  private readonly remetenteGrupos: EmailSender | Pick<EmailSenderSmtp, 'send'>;
 
   constructor(
     readonly grupos: Grupos = new Grupos(),
@@ -49,6 +50,7 @@ export class Services {
     /** E-mail de um aluno pelo nome, vindo do cadastro de alunos (aba Students). */
     private readonly emailDoAluno: (nome: string) => string | undefined = () => undefined
   ) {
+    this.remetenteGrupos = emailSender;
     this.notificacaoService = new NotificacaoService(historico, emailSender);
     this.gradeNotificationSender = gradeNotificationSender;
     this.gradeNotificationService = new GradeNotification(gradeNotificationSender);
@@ -166,6 +168,17 @@ export class Services {
     await this.notificar(nomeGrupo, MOTIVO_AVISO, grupo.participantes(),
       `${aluno} foi adicionado ao grupo ${nomeGrupo}`);
     return grupo;
+  }
+
+  /**
+   * Garante que nenhuma notificação de grupo saia por e-mail real, mesmo com
+   * NOTIFICACOES_GRUPO_EMAIL=smtp. Os testes de aceitação chamam ao zerar os dados,
+   * porque usam endereços inventados.
+   */
+  forcarEnvioSimulado(): void {
+    if (this.remetenteGrupos instanceof EmailSenderGrupos) {
+      this.remetenteGrupos.forcarSimulado();
+    }
   }
 
   consultarHistorico(grupo?: string): Notificacao[] {

@@ -18,13 +18,19 @@ const notificacoesNaTela = (tipo: string, nomeGrupo?: string) => {
 };
 
 const monitorNaTela = (nome: string) => cy.get(grupo(nome, dc('grupo-monitor')));
+// O monitor é conferido pelo atributo data-monitor (login, ou vazio sem monitor),
+// para o teste não depender do idioma do texto exibido.
+const conferirMonitorNaTela = (nome: string, monitor: string) =>
+  monitorNaTela(nome).should('have.attr', 'data-monitor', monitor);
 
 Before(() => {
   requisitar('POST', '/api/test/reset'); // cada cenário começa com o sistema vazio
 });
 
 After(() => {
-  removerAlunosCriados(); // tira do cadastro de alunos os criados pelo cenário
+  // Deixa o ambiente limpo ao fim de cada cenário
+  requisitar('POST', '/api/test/reset'); // grupos, monitores e notificações
+  removerAlunosCriados(); // alunos criados na aba Students
 });
 
 // ---------- Given (preparam o estado pela API; usados também pelos cenários de serviço) ----------
@@ -91,7 +97,7 @@ When('eu abro a página {string}', abrirPagina);
 
 // ---------- When (ações do professor pela interface) ----------
 const realocar = (monitor: string, origem: string, destino: string) => {
-  monitorNaTela(origem).should('have.text', monitor);
+  conferirMonitorNaTela(origem, monitor);
   cy.get(grupo(origem, dc('destino-input'))).type(destino);
   cy.get(grupo(origem, dc('realocar-monitor-btn'))).click();
 };
@@ -152,7 +158,7 @@ When('o sistema de alocação automática é executado para o grupo {string}', (
 });
 
 When('o professor remove o monitor {string} do grupo {string} sem realocá-lo', (monitor: string, nome: string) => {
-  monitorNaTela(nome).should('have.text', monitor);
+  conferirMonitorNaTela(nome, monitor);
   cy.get(grupo(nome, dc('remover-monitor-btn'))).click();
 });
 
@@ -192,7 +198,7 @@ Then('o histórico de notificações do grupo {string} registra a notificação 
   });
 
 Then('o grupo {string} passa a ter {string} como monitor', (nome: string, monitor: string) => {
-  monitorNaTela(nome).should('have.text', monitor);
+  conferirMonitorNaTela(nome, monitor);
 });
 
 Then('o grupo {string} passa a ter {string}, {string} e {string} como alunos',
@@ -221,13 +227,10 @@ Then('o grupo {string} mantém apenas {string} e {string} como alunos', (nome: s
   cy.get(grupo(nome, dc('grupo-aluno'))).should(iguaisA([a1, a2]));
 });
 
-const semMonitorNaTela = (nome: string) => monitorNaTela(nome).should('have.text', 'No monitor');
-Then('o grupo {string} continua sem monitor definido', semMonitorNaTela);
-Then('o grupo {string} passa a não ter monitor definido', semMonitorNaTela);
-Then('o grupo {string} está sem monitor definido', semMonitorNaTela);
+Then('o grupo {string} está sem monitor definido', (nome: string) => conferirMonitorNaTela(nome, ''));
 
 Then('o monitor {string} permanece alocado ao grupo {string}', (monitor: string, nome: string) => {
-  monitorNaTela(nome).should('have.text', monitor);
+  conferirMonitorNaTela(nome, monitor);
   comGrupo(nome, g => expect(g.monitor).to.equal(monitor));
 });
 
