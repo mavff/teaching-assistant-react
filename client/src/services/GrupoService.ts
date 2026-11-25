@@ -7,6 +7,8 @@ export interface Grupo {
 
 export interface SituacaoMonitor {
   login: string;
+  nome: string;
+  email: string;
   situacao: 'alocado' | 'livre';
   grupos: string[];
   alocacaoAutomatica: boolean;
@@ -57,6 +59,12 @@ export const grupoService = {
 
   listarNotificacoes: (): Promise<Notificacao[]> =>
     requisitar(`${baseUrl}/notificacoes`, 'Failed to fetch notifications'),
+
+  criarGrupo: (nome: string, alunos: string[]): Promise<Grupo> =>
+    enviar('POST', `${baseUrl}/grupos`, { nome, alunos }, 'Failed to create group'),
+
+  cadastrarMonitor: (login: string, nome: string, email: string): Promise<{ login: string; nome: string; email: string }> =>
+    enviar('POST', `${baseUrl}/monitores`, { login, nome, email }, 'Failed to register monitor'),
 
   alocarMonitor: (grupo: string, monitor?: string): Promise<Grupo> =>
     enviar('POST', `${grupoUrl(grupo)}/monitor`, { monitor }, 'Failed to allocate monitor'),
