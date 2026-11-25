@@ -1,10 +1,11 @@
 import { DomainError } from './DomainError';
 import { EmailSender, EmailSenderSimulado, EmailSenderSmtp } from './EmailSender';
+import { EmailSenderGrupos } from './EmailSenderGrupos';
 import { GradeNotification } from './GradeNotification';
 import { Grupo } from './Grupo';
 import { Grupos } from './Grupos';
 import { HistoricoNotificacoes } from './HistoricoNotificacoes';
-import { Monitores } from './Monitores';
+import { Monitor, Monitores } from './Monitores';
 import { Notificacao } from './Notificacao';
 import { NotificacaoService } from './NotificacaoService';
 
@@ -18,6 +19,8 @@ export const MOTIVO_ACUMULO = 'Acúmulo de grupos do monitor';
 /** Situação de um monitor na lista de monitores da disciplina. */
 export interface SituacaoMonitor {
   login: string;
+  nome: string;
+  email: string;
   situacao: 'alocado' | 'livre';
   grupos: string[];
   alocacaoAutomatica: boolean;
@@ -37,21 +40,28 @@ export class Services {
     readonly grupos: Grupos = new Grupos(),
     readonly monitores: Monitores = new Monitores(),
     readonly historico: HistoricoNotificacoes = new HistoricoNotificacoes(),
-    emailSender: EmailSender = new EmailSenderSimulado(),
+    // Nos testes automáticos o envio de grupos é sempre simulado; fora deles,
+    // EmailSenderGrupos só envia de verdade com NOTIFICACOES_GRUPO_EMAIL=smtp.
+    emailSender: EmailSender | Pick<EmailSenderSmtp, 'send'> =
+      process.env.NODE_ENV === 'test' ? new EmailSenderSimulado() : new EmailSenderGrupos(),
     gradeNotificationSender: EmailSender | Pick<EmailSenderSmtp, 'send'> =
-      process.env.NODE_ENV === 'test' ? emailSender : new EmailSenderSmtp()
+      process.env.NODE_ENV === 'test' ? emailSender : new EmailSenderSmtp(),
+    /** E-mail de um aluno pelo nome, vindo do cadastro de alunos (aba Students). */
+    private readonly emailDoAluno: (nome: string) => string | undefined = () => undefined
   ) {
     this.notificacaoService = new NotificacaoService(historico, emailSender);
     this.gradeNotificationSender = gradeNotificationSender;
     this.gradeNotificationService = new GradeNotification(gradeNotificationSender);
   }
 
+  /** Cria o grupo; cada aluno informado não pode pertencer a outro grupo. */
   criarGrupo(nome: string, alunos: string[] = []): Grupo {
+    alunos.forEach(aluno => this.exigirAlunoSemGrupo(aluno, nome));
     return this.grupos.adicionar(new Grupo(nome, alunos));
   }
 
-  cadastrarMonitor(login: string): void {
-    this.monitores.cadastrar(login);
+  cadastrarMonitor(login: string, nome: string, email: string): Monitor {
+    return this.monitores.cadastrar(login, nome, email);
   }
 
   /** Monitores que ainda não estão alocados a nenhum grupo. */
@@ -64,8 +74,11 @@ export class Services {
   situacaoDosMonitores(): SituacaoMonitor[] {
     return this.monitores.listar().map(login => {
       const grupos = this.grupos.gruposDoMonitor(login);
+      const { nome, email } = this.monitores.buscar(login)!;
       return {
         login,
+        nome,
+        email,
         situacao: grupos.length ? 'alocado' : 'livre',
         grupos: grupos.map(g => g.nome),
         alocacaoAutomatica: grupos.some(g => g.alocacaoAutomatica)
@@ -76,76 +89,81 @@ export class Services {
   /**
    * Aloca o monitor informado ao grupo, ou o primeiro monitor livre quando nenhum é
    * informado. Um monitor já alocado a outro grupo pode acumular o novo grupo; nesse
-   * caso ele recebe uma notificação própria informando o acúmulo.
+   * caso ele recebe uma notificação própria informando o acúmulo. Um grupo que já tem
+   * monitor não recebe outro: para trocar, o monitor atual é removido ou realocado antes.
    */
-  alocarMonitor(nomeGrupo: string, monitor?: string): Grupo {
+  alocarMonitor(nomeGrupo: string, monitor?: string): Promise<Grupo> {
     return this.alocar(nomeGrupo, monitor, false);
   }
 
   /** Alocação automática: escolhe um monitor livre para o grupo. */
-  alocarAutomaticamente(nomeGrupo: string): Grupo {
+  alocarAutomaticamente(nomeGrupo: string): Promise<Grupo> {
     return this.alocar(nomeGrupo, undefined, true);
   }
 
-  private alocar(nomeGrupo: string, monitor: string | undefined, automatica: boolean): Grupo {
+  private async alocar(nomeGrupo: string, monitor: string | undefined, automatica: boolean): Promise<Grupo> {
     const grupo = this.obterGrupo(nomeGrupo);
+    if (grupo.monitor) {
+      throw new DomainError('The group already has a monitor');
+    }
     const escolhido = monitor || this.monitoresDisponiveis()[0];
     if (!escolhido) {
-      throw new DomainError('Não há monitor disponível');
+      throw new DomainError('No monitor available');
     }
     if (!this.monitores.existe(escolhido)) {
-      throw new DomainError('Monitor não existe');
+      throw new DomainError('Monitor does not exist');
     }
     const outrosGrupos = this.grupos.gruposDoMonitor(escolhido).filter(g => g.nome !== nomeGrupo);
     grupo.alocarMonitor(escolhido, automatica);
     const conteudo = `O monitor ${escolhido} foi alocado ao grupo ${nomeGrupo}`;
     if (outrosGrupos.length === 0) {
-      this.notificacaoService.notificarGrupo(nomeGrupo, MOTIVO_ALOCACAO, grupo.participantes(), conteudo);
+      await this.notificar(nomeGrupo, MOTIVO_ALOCACAO, grupo.participantes(), conteudo);
     } else {
       const todos = [...outrosGrupos.map(g => g.nome), nomeGrupo].join(', ');
-      this.notificacaoService.notificarGrupo(nomeGrupo, MOTIVO_ALOCACAO, [...grupo.alunos], conteudo);
-      this.notificacaoService.notificarGrupo(nomeGrupo, MOTIVO_ACUMULO, [escolhido],
+      await this.notificar(nomeGrupo, MOTIVO_ALOCACAO, [...grupo.alunos], conteudo);
+      await this.notificar(nomeGrupo, MOTIVO_ACUMULO, [escolhido],
         `Você agora é responsável pelos grupos ${todos}`);
     }
     return grupo;
   }
 
   /** Remove o monitor do grupo sem realocá-lo; avisa os alunos do grupo. */
-  removerMonitor(nomeGrupo: string): Grupo {
+  async removerMonitor(nomeGrupo: string): Promise<Grupo> {
     const grupo = this.obterGrupo(nomeGrupo);
     const monitor = grupo.monitor;
     grupo.removerMonitor();
-    this.notificacaoService.notificarGrupo(nomeGrupo, MOTIVO_REMOCAO, [...grupo.alunos],
+    await this.notificar(nomeGrupo, MOTIVO_REMOCAO, [...grupo.alunos],
       `O monitor ${monitor} foi removido do grupo ${nomeGrupo}`);
     return grupo;
   }
 
   /** Move o monitor de um grupo para outro; avisa os alunos dos dois grupos. */
-  realocarMonitor(nomeOrigem: string, monitor: string, nomeDestino: string): Grupo {
+  async realocarMonitor(nomeOrigem: string, monitor: string, nomeDestino: string): Promise<Grupo> {
     const origem = this.obterGrupo(nomeOrigem);
     const destino = this.grupos.buscar(nomeDestino);
     if (!destino) {
-      throw new DomainError('Grupo de destino não existe');
+      throw new DomainError('Destination group does not exist');
     }
     if (origem.monitor !== monitor) {
-      throw new DomainError('O monitor não está alocado ao grupo de origem');
+      throw new DomainError('The monitor is not allocated to the source group');
     }
     if (destino.monitor) {
-      throw new DomainError('O grupo de destino já possui monitor');
+      throw new DomainError('The destination group already has a monitor');
     }
     origem.removerMonitor();
     destino.alocarMonitor(monitor);
-    this.notificacaoService.notificarGrupo(nomeOrigem, MOTIVO_SAIDA, [...origem.alunos],
+    await this.notificar(nomeOrigem, MOTIVO_SAIDA, [...origem.alunos],
       `O monitor ${monitor} deixou o grupo ${nomeOrigem}`);
-    this.notificacaoService.notificarGrupo(nomeDestino, MOTIVO_ENTRADA, [...destino.alunos],
+    await this.notificar(nomeDestino, MOTIVO_ENTRADA, [...destino.alunos],
       `O monitor ${monitor} passou a acompanhar o grupo ${nomeDestino}`);
     return destino;
   }
 
-  adicionarAluno(nomeGrupo: string, aluno: string): Grupo {
+  async adicionarAluno(nomeGrupo: string, aluno: string): Promise<Grupo> {
     const grupo = this.obterGrupo(nomeGrupo);
+    this.exigirAlunoSemGrupo(aluno, nomeGrupo);
     grupo.adicionarAluno(aluno);
-    this.notificacaoService.notificarGrupo(nomeGrupo, MOTIVO_AVISO, grupo.participantes(),
+    await this.notificar(nomeGrupo, MOTIVO_AVISO, grupo.participantes(),
       `${aluno} foi adicionado ao grupo ${nomeGrupo}`);
     return grupo;
   }
@@ -154,10 +172,28 @@ export class Services {
     return grupo ? this.historico.listarDoGrupo(grupo) : this.historico.listar();
   }
 
+  /**
+   * Notifica os destinatários de uma mudança no grupo. O e-mail vai para o endereço
+   * cadastrado: o do monitor pelo login, o do aluno pelo cadastro de alunos. Sem
+   * endereço conhecido, o nome é repassado e o envio real o recusa como Falha.
+   */
+  private notificar(grupo: string, motivo: string, destinatarios: string[], conteudo: string) {
+    return this.notificacaoService.notificarGrupo(grupo, motivo, destinatarios, conteudo, destinatario =>
+      this.monitores.buscar(destinatario)?.email || this.emailDoAluno(destinatario) || destinatario);
+  }
+
+  /** Um aluno pertence a um único grupo; o próprio grupo trata a repetição dentro dele. */
+  private exigirAlunoSemGrupo(aluno: string, nomeGrupo: string): void {
+    const atual = this.grupos.grupoDoAluno(aluno);
+    if (atual && atual.nome !== nomeGrupo) {
+      throw new DomainError(`${aluno} is already in group ${atual.nome}`);
+    }
+  }
+
   private obterGrupo(nome: string): Grupo {
     const grupo = this.grupos.buscar(nome);
     if (!grupo) {
-      throw new DomainError('Grupo não existe');
+      throw new DomainError('Group does not exist');
     }
     return grupo;
   }

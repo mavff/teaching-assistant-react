@@ -30,10 +30,10 @@ const paraJson = (n: Notificacao) => ({
  * the message shown to the user, like the other routes of the server; anything
  * else is a failure of the server itself (500).
  */
-const tratar = (handler: (req: Request, res: Response) => void) =>
-  (req: Request, res: Response, _next: NextFunction) => {
+const tratar = (handler: (req: Request, res: Response) => void | Promise<void>) =>
+  async (req: Request, res: Response, _next: NextFunction) => {
     try {
-      handler(req, res);
+      await handler(req, res);
     } catch (error) {
       if (error instanceof DomainError) {
         res.status(400).json({ error: error.message });
@@ -62,8 +62,7 @@ export function grupoRoutes(services: Services): Router {
   }));
 
   router.post('/monitores', tratar((req, res) => {
-    services.cadastrarMonitor(req.body.login);
-    res.status(201).json({ login: req.body.login });
+    res.status(201).json(services.cadastrarMonitor(req.body.login, req.body.nome, req.body.email));
   }));
 
   // Lists the monitors that are not allocated to any group
@@ -71,8 +70,8 @@ export function grupoRoutes(services: Services): Router {
     res.json(services.monitoresDisponiveis());
   }));
 
-  router.post('/grupos/:nome/monitor', tratar((req, res) => {
-    res.status(201).json(services.alocarMonitor(req.params.nome, req.body.monitor).toJSON());
+  router.post('/grupos/:nome/monitor', tratar(async (req, res) => {
+    res.status(201).json((await services.alocarMonitor(req.params.nome, req.body.monitor)).toJSON());
   }));
 
   // Lista de monitores da disciplina, com a situação de cada um
@@ -80,21 +79,21 @@ export function grupoRoutes(services: Services): Router {
     res.json(services.situacaoDosMonitores());
   }));
 
-  router.post('/grupos/:nome/alocacao-automatica', tratar((req, res) => {
-    res.status(201).json(services.alocarAutomaticamente(req.params.nome).toJSON());
+  router.post('/grupos/:nome/alocacao-automatica', tratar(async (req, res) => {
+    res.status(201).json((await services.alocarAutomaticamente(req.params.nome)).toJSON());
   }));
 
-  router.delete('/grupos/:nome/monitor', tratar((req, res) => {
-    res.json(services.removerMonitor(req.params.nome).toJSON());
+  router.delete('/grupos/:nome/monitor', tratar(async (req, res) => {
+    res.json((await services.removerMonitor(req.params.nome)).toJSON());
   }));
 
-  router.post('/grupos/:nome/realocar-monitor', tratar((req, res) => {
+  router.post('/grupos/:nome/realocar-monitor', tratar(async (req, res) => {
     res.status(201).json(
-      services.realocarMonitor(req.params.nome, req.body.monitor, req.body.destino).toJSON());
+      (await services.realocarMonitor(req.params.nome, req.body.monitor, req.body.destino)).toJSON());
   }));
 
-  router.post('/grupos/:nome/alunos', tratar((req, res) => {
-    res.status(201).json(services.adicionarAluno(req.params.nome, req.body.aluno).toJSON());
+  router.post('/grupos/:nome/alunos', tratar(async (req, res) => {
+    res.status(201).json((await services.adicionarAluno(req.params.nome, req.body.aluno)).toJSON());
   }));
 
   router.get('/grupos/:nome/notificacoes', tratar((req, res) => {

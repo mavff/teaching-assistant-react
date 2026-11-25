@@ -24,7 +24,8 @@ export class NotificacaoService {
 
   constructor(
     private readonly historico: HistoricoNotificacoes,
-    private readonly emailSender: EmailSender,
+    // O envio de grupos pode ser real (assíncrono) ou simulado.
+    private readonly emailSender: EmailSender | Pick<EmailSenderSmtp, 'send'>,
     private readonly lembretes?: DependenciasLembretes
   ) {}
 
@@ -323,10 +324,21 @@ export class NotificacaoService {
     this.cancelamentoPendenteDeGravacao = true;
   }
 
-  /** Notifica cada destinatário sobre uma mudança na composição de um grupo. */
-  notificarGrupo(grupo: string, motivo: string, destinatarios: string[], conteudo: string): Notificacao[] {
-    return destinatarios.map(destinatario => {
-      const envio = this.emailSender.send(destinatario, `${motivo} - ${grupo}`, conteudo);
+  /**
+   * Notifica cada destinatário sobre uma mudança na composição de um grupo.
+   * O e-mail vai para o endereço informado por enderecoDe; o histórico guarda o nome.
+   * Os envios são feitos um de cada vez, na ordem dos destinatários.
+   */
+  async notificarGrupo(
+    grupo: string,
+    motivo: string,
+    destinatarios: string[],
+    conteudo: string,
+    enderecoDe: (destinatario: string) => string = destinatario => destinatario
+  ): Promise<Notificacao[]> {
+    const notificacoes: Notificacao[] = [];
+    for (const destinatario of destinatarios) {
+      const envio = await this.emailSender.send(enderecoDe(destinatario), `${motivo} - ${grupo}`, conteudo);
       const notificacao = new Notificacao(
         this.historico.proximoId(),
         destinatario,
@@ -337,7 +349,8 @@ export class NotificacaoService {
         envio.descricaoFalha
       );
       this.historico.registrar(notificacao);
-      return notificacao;
-    });
+      notificacoes.push(notificacao);
+    }
+    return notificacoes;
   }
 }
