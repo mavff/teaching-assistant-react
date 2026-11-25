@@ -222,6 +222,7 @@ const Grupos: React.FC = () => {
                   <span
                     className={`gp-pill ${grupo.monitor ? 'gp-pill--ok' : 'gp-pill--vazio'}`}
                     data-cy="grupo-monitor"
+                    data-monitor={grupo.monitor ?? ''}
                   >{grupo.monitor ?? 'No monitor'}</span>
                 </div>
               </header>
@@ -358,7 +359,7 @@ const Grupos: React.FC = () => {
               </span>
               {m.grupos.length > 0 && (
                 <span className="gp-monitor-grupos">
-                  in group <strong data-cy="monitor-grupos">{m.grupos.join(', ')}</strong>
+                  {m.grupos.length > 1 ? 'in groups' : 'in group'} <strong data-cy="monitor-grupos">{m.grupos.join(', ')}</strong>
                 </span>
               )}
               {m.alocacaoAutomatica && <span className="gp-tag-auto" data-cy="monitor-automatica">automatic allocation</span>}

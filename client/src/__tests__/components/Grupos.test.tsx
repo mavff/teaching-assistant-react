@@ -206,6 +206,16 @@ describe('GUI de notificação de alocação de monitor e aluno', () => {
     expect(lista.getByText('joao@cin.ufpe.br')).toBeInTheDocument();
     expect(lista.getByText('Allocated')).toBeInTheDocument();
     expect(lista.getByText('automatic allocation')).toBeInTheDocument();
+    expect(lista.getByText('in group')).toBeInTheDocument();
+  });
+
+  it('usa "in groups" para monitor responsável por mais de um grupo', async () => {
+    estado([], [{ ...joao, situacao: 'alocado', grupos: ['ESS-G3', 'ESS-G7'] }], []);
+    render(<Grupos />);
+
+    const lista = within((await screen.findByText('João Silva')).closest('li') as HTMLElement);
+    expect(lista.getByText('in groups')).toBeInTheDocument();
+    expect(lista.getByText('ESS-G3, ESS-G7')).toBeInTheDocument();
   });
 
   describe('criar grupo', () => {
