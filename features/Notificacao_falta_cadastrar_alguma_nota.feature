@@ -450,6 +450,7 @@ Feature: Notificações de pendências no lançamento de notas
 
    @service
    # DDD (regra central representada): processarLembretesAteAgora seleciona os reenvios cujo horário já chegou; a terceira Falha de 09:00:45 preserva as anteriores e programa 09:01:30; os dois passos de erro usam descrição da falha, conforme descricaoFalha.
+   # Validação: completa (Jest, LembretesAutomaticos.test.ts).
    Scenario: Reenvio progressivo após falhas persistentes
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"

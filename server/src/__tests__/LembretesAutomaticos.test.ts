@@ -207,17 +207,18 @@ describe('Lembretes automáticos no servidor', () => {
   });
 
   test('cancela o quarto envio quando a nota é lançada e recupera o cancelamento ao reiniciar', async () => {
-    jest.setSystemTime(new Date('2026-08-25T08:59:30-03:00')); // Given: o agendador fará a primeira tentativa às 09h.
-    prepararDados(); // Given: turma ESS, prazo e uma nota pendente em Design.
+    jest.setSystemTime(new Date('2026-08-25T08:59:30-03:00')); // Given: a primeira rodada acontece às 09h.
+    prepararDados(); // Given: turma ESS, prazo e uma nota de Design pendente.
     const inicial = iniciar();
     const descricaoFalha = 'Indisponibilidade temporária do serviço de e-mail';
     inicial.send.mockImplementation(async (para: string) =>
       para === destinatario ? { aceito: false, descricaoFalha } : { aceito: true }
-    ); // Given: falham os lembretes ao professor. A notificação de nota ao aluno pode ser aceita.
+    ); // Given: o transporte simulado rejeita os lembretes ao professor.
     const enviosAoProfessor = () => inicial.send.mock.calls.filter(([para]) => para === destinatario);
 
     await request(inicial.app).put(rota).send({ quantidade: 1, lembretes: [lembrete] }).expect(200);
-    await jest.advanceTimersByTimeAsync(90_000); // Given: chega 09:01:00, depois das três falhas.
+
+    await jest.advanceTimersByTimeAsync(75_000); // When do cenário 453: chega às 09:00:45, na terceira tentativa.
     const historicoAntes = resumoDoHistorico(inicial);
     expect(historicoAntes).toEqual([
       '2026-08-25T12:00:00.000Z',
@@ -225,22 +226,31 @@ describe('Lembretes automáticos no servidor', () => {
       '2026-08-25T12:00:45.000Z'
     ].map(dataHora => expect.objectContaining({
       lembreteId: lembrete.id, resultado: 'Falha', descricaoFalha, dataHora
-    }))); // Given: confirma os horários e a descrição das três falhas.
+    }))); // Then: registra a terceira falha e preserva as duas anteriores.
 
+    expect(enviosAoProfessor()).toHaveLength(3); // Then: as três solicitações chegaram ao transporte que as rejeitou.
+    const aposTerceira = await request(inicial.app).get(rota).expect(200);
+    expect(aposTerceira.body.lembretes).toEqual([{
+      ...lembrete, estado: 'Não enviado', motivo: null,
+      proximoReenvioEm: '2026-08-25T12:01:30.000Z'
+    }]); // Then: o lembrete segue sem envio aceito e a quarta tentativa está marcada para 09:01:30.
+    expect(aposTerceira.body.prazoAcademico).toBe('2026-09-01T02:59:00.000Z'); // Then: o prazo segue 31/08 às 23:59 em Brasília.
+
+    await jest.advanceTimersByTimeAsync(15_000); // Retoma o cenário de cancelamento às 09:01:00.
     const rotaNota = `/api/classes/ESS-2026-2/enrollments/${cpf}/evaluation`;
-    await request(inicial.app).put(rotaNota).send({ goal: 'Design', grade: 'MA' }).expect(200); // Given: lança a nota às 09:01:00.
+    await request(inicial.app).put(rotaNota).send({ goal: 'Design', grade: 'MA' }).expect(200);
     const aguardando = await request(inicial.app).get(rota).expect(200);
-    expect(aguardando.body.lembretes[0].proximoReenvioEm).toBe('2026-08-25T12:01:30.000Z'); // Given: a quarta tentativa ainda está programada.
+    expect(aguardando.body.lembretes[0].proximoReenvioEm).toBe('2026-08-25T12:01:30.000Z');
 
-    await jest.advanceTimersByTimeAsync(30_000); // When: o agendador chega ao horário do quarto envio.
+    await jest.advanceTimersByTimeAsync(30_000); // When do cancelamento: chega o horário da quarta tentativa.
 
-    expect(enviosAoProfessor()).toHaveLength(3); // Then: nenhuma quarta solicitação ao professor.
-    expect(resumoDoHistorico(inicial)).toEqual(historicoAntes); // Then: preserva as três falhas, sem registro novo.
+    expect(enviosAoProfessor()).toHaveLength(3); // Then: a quarta tentativa foi cancelada antes do transporte.
+    expect(resumoDoHistorico(inicial)).toEqual(historicoAntes);
     const cancelado = {
       ...lembrete, estado: 'Cancelado', motivo: 'Nenhuma nota pendente', proximoReenvioEm: null
     };
     const consulta = await request(inicial.app).get(rota).expect(200);
-    expect(consulta.body.lembretes).toEqual([cancelado]); // Then: o único lembrete foi cancelado e perdeu a programação.
+    expect(consulta.body.lembretes).toEqual([cancelado]);
 
     inicial.parar();
     const reiniciado = iniciar();
