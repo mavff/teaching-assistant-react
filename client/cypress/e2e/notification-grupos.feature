@@ -84,7 +84,7 @@ Funcionalidade: Notificação de alocação de monitor e aluno
     Quando o professor tenta alocar um monitor ao grupo "ESS-G3"
     Então o sistema exibe uma mensagem informando que não há monitor disponível
     E nenhuma notificação é enviada
-    E o grupo "ESS-G3" continua sem monitor definido
+    E o grupo "ESS-G3" está sem monitor definido
 
   Cenário: notificar participantes na realocação de monitor entre grupos
     Dado o grupo "ESS-G3" existe com os alunos "Mariana" e "Pedro" e o monitor "joaosilva"
@@ -100,7 +100,7 @@ Funcionalidade: Notificação de alocação de monitor e aluno
     E o grupo "ESS-G4" existe com os alunos "Lucas" e "Beatriz" e sem monitor definido
     E eu estou na página "Groups"
     Quando o professor realoca o monitor "joaosilva" do grupo "ESS-G3" para o grupo "ESS-G4"
-    Então o grupo "ESS-G3" passa a não ter monitor definido
+    Então o grupo "ESS-G3" está sem monitor definido
     E o grupo "ESS-G4" passa a ter "joaosilva" como monitor
 
   Cenário: alocação automática quando há apenas um monitor disponível
@@ -126,14 +126,14 @@ Funcionalidade: Notificação de alocação de monitor e aluno
     Quando o sistema de alocação automática é executado para o grupo "ESS-G5"
     Então o sistema exibe uma mensagem informando que não há monitor disponível
     E nenhuma notificação é enviada
-    E o grupo "ESS-G5" continua sem monitor definido
+    E o grupo "ESS-G5" está sem monitor definido
 
   Cenário: notificar alunos quando monitor é removido do grupo sem realocação
     Dado o grupo "ESS-G3" existe com os alunos "Mariana" e "Pedro" e o monitor "joaosilva"
     E eu estou na página "Groups"
     Quando o professor remove o monitor "joaosilva" do grupo "ESS-G3" sem realocá-lo
     Então o sistema envia uma notificação de remoção do grupo "ESS-G3" para "Mariana" e "Pedro"
-    E o grupo "ESS-G3" passa a não ter monitor definido
+    E o grupo "ESS-G3" está sem monitor definido
 
   Cenário: não notificar quando realocação de monitor falha
     Dado o monitor "joaosilva" está alocado ao grupo "ESS-G3"

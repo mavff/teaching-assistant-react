@@ -82,7 +82,7 @@ Feature: Notificação de alocação de monitor e aluno
     When o professor tenta alocar um monitor ao grupo "ESS-G3"
     Then o sistema exibe uma mensagem informando que não há monitor disponível
     And nenhuma notificação é enviada
-    And o grupo "ESS-G3" continua sem monitor definido
+    And o grupo "ESS-G3" está sem monitor definido
 
   Scenario: notificar participantes na realocação de monitor entre grupos
     Given o grupo "ESS-G3" existe com os alunos "Mariana" e "Pedro" e o monitor "joaosilva"
@@ -98,7 +98,7 @@ Feature: Notificação de alocação de monitor e aluno
     And o grupo "ESS-G4" existe com os alunos "Lucas" e "Beatriz" e sem monitor definido
     And eu estou na página "Groups"
     When o professor realoca o monitor "joaosilva" do grupo "ESS-G3" para o grupo "ESS-G4"
-    Then o grupo "ESS-G3" passa a não ter monitor definido
+    Then o grupo "ESS-G3" está sem monitor definido
     And o grupo "ESS-G4" passa a ter "joaosilva" como monitor
 
   Scenario: alocação automática quando há apenas um monitor disponível
@@ -124,14 +124,14 @@ Feature: Notificação de alocação de monitor e aluno
     When o sistema de alocação automática é executado para o grupo "ESS-G5"
     Then o sistema exibe uma mensagem informando que não há monitor disponível
     And nenhuma notificação é enviada
-    And o grupo "ESS-G5" continua sem monitor definido
+    And o grupo "ESS-G5" está sem monitor definido
 
   Scenario: notificar alunos quando monitor é removido do grupo sem realocação
     Given o grupo "ESS-G3" existe com os alunos "Mariana" e "Pedro" e o monitor "joaosilva"
     And eu estou na página "Groups"
     When o professor remove o monitor "joaosilva" do grupo "ESS-G3" sem realocá-lo
     Then o sistema envia uma notificação de remoção do grupo "ESS-G3" para "Mariana" e "Pedro"
-    And o grupo "ESS-G3" passa a não ter monitor definido
+    And o grupo "ESS-G3" está sem monitor definido
 
   Scenario: não notificar quando realocação de monitor falha
     Given o monitor "joaosilva" está alocado ao grupo "ESS-G3"
