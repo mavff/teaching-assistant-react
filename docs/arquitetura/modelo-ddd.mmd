@@ -77,6 +77,16 @@ namespace Servidor {
     obterPeriodoAcademico() PeriodoAcademico
     obterConfiguracaoLembretes() ConfiguracaoLembretes
     buscarLembretesPorDataEHorario(data, horario) Lembrete[]
+    listarLembretes() Lembrete[]
+    marcarLembreteComoEnviado(id)
+    ignorarLembrete(id, motivo)
+    programarReenvioDeLembrete(id, dataHora)
+    cancelarReenvioDeLembrete(id, motivo)
+    serializarLembretes()
+    restaurarLembretes(lembretes)
+    possuiAgendamentosPendentesApos(novoPrazo) boolean
+    prepararConfiguracaoLembretes(quantidade, propostas, instanteAtual, prazo) ConfiguracaoLembretes
+    atualizarLembretes(quantidade, propostas, instanteAtual, prazo)
     identificarPendencias()
   }
   class PeriodoAcademico {
@@ -84,7 +94,11 @@ namespace Servidor {
     semestre
     prazoAcademico
     prazoEncerrado(instanteAtual) boolean
-    definirPrazoAcademico(novoPrazo, instanteAtual, configuracoesDoPeriodo)
+    definirPrazoAcademico(novoPrazo, instanteAtual, consultasDoPeriodo)
+  }
+  class ConsultaDeAgendamentos {
+    <<interface>>
+    possuiAgendamentosPendentesApos(novoPrazo) boolean
   }
   class Enrolment {
     getEvaluationForGoal(meta)
@@ -210,7 +224,8 @@ Services --> HistoricoNotificacoes
 %% PRAZO COMPARTILHADO: cada turma acessa o único período correspondente ao seu ano e semestre.
 Class "*" --> "1" PeriodoAcademico : período
 Services --> PeriodoAcademico
-PeriodoAcademico --> ConfiguracaoLembretes : valida pendências
+PeriodoAcademico ..> ConsultaDeAgendamentos : valida pendências
+Class ..|> ConsultaDeAgendamentos
 
 %% NOTIFICAÇÃO: objeto e ligações aprovados para este incremento.
 HistoricoNotificacoes *--> "*" Notificacao
@@ -259,14 +274,14 @@ HistoricoNotificacoes <-- NotificacaoService
 %% DEFINIÇÃO DO PRAZO: Services.definirPrazoAcademico(ano, semestre, novoPrazo) coordena o cadastro e a edição por período.
 %% Obter o único PeriodoAcademico correspondente ao ano e semestre, independentemente de haver turmas cadastradas.
 %% Classes.buscarPorPeriodo retorna todas e somente as Class desse ano e semestre, sem modificar dados.
-%% Services obtém a configuração de cada uma dessas turmas e fornece o conjunto completo em configuracoesDoPeriodo.
+%% Services fornece as turmas do período como consultas de agendamentos pendentes.
 %% Não receber essa lista do cliente nem validar apenas a turma que estiver aberta na interface.
-%% Consultar uma vez o relógio do servidor e chamar PeriodoAcademico.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoesDoPeriodo).
+%% Consultar uma vez o relógio do servidor e chamar PeriodoAcademico.definirPrazoAcademico(novoPrazo, instanteAtual, consultasDoPeriodo).
 %% O professor informa ano, semestre e novo prazo; instanteAtual não vem do cliente nem é armazenado como atributo.
 %% Rejeitar uma data de prazo inválida com Prazo acadêmico inválido, sem modificar dados.
 %% Se novoPrazo for anterior a instanteAtual, rejeitar com Prazo acadêmico não pode ser anterior à data atual.
 %% A igualdade com instanteAtual é permitida, mas não dispensa a verificação dos agendamentos pendentes.
-%% Antes de alterar prazoAcademico, PeriodoAcademico consulta cada configuração recebida por possuiAgendamentosPendentesApos(novoPrazo).
+%% Antes de alterar prazoAcademico, PeriodoAcademico usa possuiAgendamentosPendentesApos(novoPrazo) em cada consulta recebida.
 %% Cada consulta considera seus Lembretes em Não enviado ou Agendado, sem unificar esses estados.
 %% Retornar verdadeiro se a data e horário originais de algum deles forem posteriores ao novo prazo
 %% ou se seu proximoReenvioEm estiver preenchido e for posterior ao novo prazo.
@@ -451,8 +466,8 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Não enviado e Agendado não são unificados por este incremento.
 
 %% CONSULTA DA CONFIGURAÇÃO: Services.consultarConfiguracaoLembretes(turma) coordena a leitura da turma selecionada.
-%% Classes.buscar(turma) localiza a Class indicada; Class.obterConfiguracaoLembretes devolve sua configuração associada.
-%% ConfiguracaoLembretes.listar retorna todos os seus lembretes, com id, data, horário e estado, incluindo os Enviados.
+%% Classes.buscar(turma) localiza a Class indicada. Class.serializarLembretes delega a leitura à configuração.
+%% A leitura retorna todos os lembretes da turma, com id, data, horário e estado, incluindo os Enviados.
 %% Usar as relações existentes Services --> Classes, Classes *--> Class, Class --> ConfiguracaoLembretes
 %% e ConfiguracaoLembretes *--> Lembrete; para o prazo, usar Class --> PeriodoAcademico.
 %% Services devolve os lembretes, o prazoAcademico do período da Class e a quantidade calculada pelo total da lista.
@@ -474,10 +489,11 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Services.configurarLembretes(turma, quantidade, lembretesPropostos) continua sendo a entrada conceitual da aplicação.
 %% O serviço consulta o relógio do servidor uma vez por atualização e fornece instanteAtual.
 %% instanteAtual não é informado pelo professor nem armazenado como atributo da configuração.
-%% O prazo é obtido do período da mesma Class; a gravação integral em armazenamento continua pendente.
+%% O prazo é obtido do período da mesma Class. O servidor grava a proposta validada antes de aplicá-la em memória.
 
 %% CONTRATO DE SALVAMENTO: Services recebe a turma selecionada, a quantidade e a proposta do conjunto final.
-%% Localizar a Class por Classes.buscar(turma) e obter sua configuração por obterConfiguracaoLembretes().
+%% Localizar a Class por Classes.buscar(turma) e chamar prepararConfiguracaoLembretes para validar uma cópia.
+%% Após gravar a proposta, chamar Class.atualizarLembretes para aplicá-la à configuração armazenada.
 %% O serviço fornece o instante obtido do relógio e o prazoAcademico do período da mesma Class a atualizar.
 %% Usar as associações existentes com Classes, Class, PeriodoAcademico, ConfiguracaoLembretes e Lembrete.
 %% O retorno String contém a confirmação ou o motivo da rejeição previsto no cenário.
