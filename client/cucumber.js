@@ -26,5 +26,12 @@ module.exports = {
     requireModule: ['ts-node/register/transpile-only'],
     require: ['src/step-definitions/lembretes-gui-steps.ts'],
     format: ['progress-bar']
+  },
+  historicoGui: {
+    paths: ['../features/Notificacao_falta_cadastrar_alguma_nota.feature'],
+    name: ['^Visualização do histórico de notificações$'],
+    requireModule: ['ts-node/register/transpile-only'],
+    require: ['src/step-definitions/historico-gui-steps.ts'],
+    format: ['progress-bar']
   }
 };

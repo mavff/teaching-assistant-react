@@ -1,4 +1,6 @@
-import { ConfiguracaoLembretes } from './ConfiguracaoLembretes';
+type ConsultaDeAgendamentos = {
+  possuiAgendamentosPendentesApos(novoPrazo: Date): boolean;
+};
 
 export class PeriodoAcademico {
   private readonly ano: number;
@@ -28,16 +30,20 @@ export class PeriodoAcademico {
     return instanteAtual.getTime() > this.prazoAcademico.getTime(); // Exatamente no prazo ainda não está encerrado, conforme o DDD.
   }
 
-  definirPrazoAcademico(novoPrazo: Date, instanteAtual: Date, configuracoesDoPeriodo: readonly ConfiguracaoLembretes[]): void {
+  definirPrazoAcademico(
+    novoPrazo: Date,
+    instanteAtual: Date,
+    consultasDoPeriodo: readonly ConsultaDeAgendamentos[]
+  ): void {
     if (!Number.isFinite(novoPrazo.getTime())) throw new Error('Prazo acadêmico inválido');
     if (!Number.isFinite(instanteAtual.getTime())) throw new Error('Instante atual inválido');
     if (novoPrazo.getTime() < instanteAtual.getTime()) {
       throw new Error('Prazo acadêmico não pode ser anterior à data atual');
     }
-    if (configuracoesDoPeriodo.some(configuracao => configuracao.possuiAgendamentosPendentesApos(novoPrazo))) {
+    if (consultasDoPeriodo.some(consulta => consulta.possuiAgendamentosPendentesApos(novoPrazo))) {
       throw new Error('Prazo acadêmico incompatível com lembretes pendentes');
     }
 
-    this.prazoAcademico = new Date(novoPrazo.getTime()); // Só altera o prazo após validar todas as configurações recebidas; nenhuma delas é modificada.
+    this.prazoAcademico = new Date(novoPrazo.getTime()); // Só altera o prazo após consultar todos os agendamentos do período.
   }
 }
