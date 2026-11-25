@@ -332,6 +332,7 @@ Feature: Notificações de pendências no lançamento de notas
 
    @service
    # DDD (parcial): Busca e pendências ficam restritas à turma indicada, com o mesmo emailProfessor e contrato de EmailSender; o comentário complementar sobre processar foi dispensado pelo responsável, sem exigir alteração estrutural; classificação mantida até a conclusão da revisão do cenário.
+   # Validação: completa (Jest, NotificacaoService.test.ts).
    Scenario: Envio independente de lembretes para múltiplas turmas
       Given o professor "Paulo Borba" é responsável pelas turmas "2026.2 de ESS" e "2026.2 de Introdução a Programação" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
