@@ -53,6 +53,14 @@ namespace Servidor {
     consultarHistorico()
     filtrarHistorico(disciplina, turma)
     consultarDetalhesNotificacao(idNotificacao)
+    criarGrupo(nome, alunos)
+    cadastrarMonitor(login, nome, email)
+    alocarMonitor(grupo, monitor)
+    alocarAutomaticamente(grupo)
+    realocarMonitor(grupo, monitor, destino)
+    removerMonitor(grupo)
+    adicionarAluno(grupo, aluno)
+    situacaoDosMonitores()
   }
   class StudentListImport["StudentList Import"]
   class StudentList {
@@ -137,6 +145,7 @@ namespace Servidor {
     montarEmailNotasPendentes(turma, destinatario, prazoAcademico)
     processar(turma, Lembrete, dependencias)
     processarAgendados(turmaId, data, horario)
+    notificarGrupo(grupo, motivo, destinatarios, conteudo, enderecoDe)
   }
   class HistoricoNotificacoes {
     registrar(Notificacao)
@@ -151,6 +160,7 @@ namespace Servidor {
     lembreteId
     nomeDestinatario
     turmaRegistrada
+    grupoRegistrado
     dataHora
     resultado
     motivo
@@ -574,6 +584,19 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Os cenários usam motivo tanto para o propósito do aviso quanto para a causa da falha.
 %% Essa diferença de linguagem precisa de validação; os cenários não são reinterpretados aqui.
 %% A relação de GradeNotification com EmailSender já existe na base.
+%% GRUPOS E MONITORES: representados apenas por métodos de Services, sem classes próprias neste diagrama.
+%% Services mantém os grupos (no máximo um monitor por grupo, alunos sem repetição) e o cadastro de monitores.
+%% Cada aluno pertence a um único grupo: criarGrupo e adicionarAluno recusam aluno que já está em outro grupo.
+%% Cada monitor tem login (identificação), nome e e-mail válido; o mesmo login não é cadastrado duas vezes.
+%% Um grupo que já tem monitor não recebe outro: o monitor atual é removido ou realocado antes.
+%% Um monitor pode acumular grupos; a realocação exige grupo de destino existente e sem monitor.
+%% Cada mudança bem-sucedida solicita NotificacaoService.notificarGrupo, que registra uma Notificacao por destinatário.
+%% grupoRegistrado identifica o grupo da notificação; nesse caso turmaRegistrada e lembreteId ficam vazios.
+%% Motivos de grupo: alocação, aviso (aluno adicionado), saída, entrada, remoção e acúmulo de grupos.
+%% Uma operação rejeitada não altera o grupo nem gera notificação.
+%% O e-mail vai ao endereço cadastrado: monitor pelo login, aluno pelo cadastro de alunos; sem endereço, o registro fica Falha.
+%% O envio real usa EmailSenderSmtp somente com NOTIFICACOES_GRUPO_EMAIL=smtp; sem isso, o envio é simulado.
+%% consultarHistorico continua sendo a consulta geral do histórico; para grupos, ela também aceita filtrar pelo grupoRegistrado.
 
 style Notificacao fill:#fff4cd,stroke:#93600c,stroke-width:2px
 note for Services "configurarLembretes reúne quantidade, datas e horários."
