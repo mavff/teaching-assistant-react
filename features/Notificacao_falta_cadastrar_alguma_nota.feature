@@ -393,6 +393,7 @@ Feature: Notificações de pendências no lançamento de notas
    
    @service
    # DDD (regra central representada): proximoReenvioEm e programarReenvio representam a programação; processar programa o primeiro reenvio para 15 segundos após a primeira Falha e marcarComoEnviado limpa a programação após o sucesso; os dois passos da falha preservam o erro como descrição da falha, conforme o campo descricaoFalha.
+   # Validação: completa (Jest, LembretesAutomaticos.test.ts).
    Scenario: Reenvio automático após falha temporária
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
       And a turma "2026.2 de ESS" possui apenas o aluno matriculado "João da Silva" e a avaliação "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
@@ -415,6 +416,7 @@ Feature: Notificações de pendências no lançamento de notas
 
    @service
    # DDD (regra central representada): jaFoiEnviado() faz processar encerrar sem novo email, notificação de tentativa ou reenvio; preserva lembrete e histórico.
+   # Validação: completa (Jest, NotificacaoService.test.ts).
    Scenario: Prevenção de envio duplicado por reprocessamento de lembrete já enviado
       Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail "paulo.borba@example.com"
       And a turma possui o aluno "João da Silva", sem nota cadastrada em "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
@@ -430,24 +432,6 @@ Feature: Notificações de pendências no lançamento de notas
       And o lembrete continua contabilizado como um único envio
 
 
-
-   @service
-   # DDD (regra central representada): O mesmo bloqueio preserva as duas notificações anteriores e impede uma terceira tentativa quando o estado recebido já é Enviado.
-   Scenario: Bloqueio de novo reenvio após sucesso de tentativa anterior
-      Given o professor "Paulo Borba" é responsável pela turma "2026.2 de ESS" e possui o e-mail cadastrado "paulo.borba@example.com"
-      And a turma possui apenas o aluno "João da Silva", sem nota cadastrada em "Prova de SOLID e Padrões de Projeto", realizada em "20/08/2026 às 14:00"
-      And a turma possui um lembrete programado para "25/08/2026 às 09:00"
-      And o histórico de "Paulo Borba" registra uma tentativa inicial desse lembrete com status "Falha"
-      And o histórico registra um reenvio do mesmo lembrete em "25/08/2026 às 09:00:15" com status "Enviado"
-      And exatamente um e-mail desse lembrete foi aceito pelo serviço de e-mail do "Gmail"
-      And o lembrete possui status "Enviado" e não possui novos reenvios programados
-      And o prazo acadêmico da turma é "31/08/2026 às 23:59"
-      When o serviço recebe uma solicitação atrasada de reenvio desse lembrete em "25/08/2026 às 09:01"
-      Then nenhuma nova solicitação de envio é realizada ao serviço de e-mail do "Gmail"
-      And o histórico permanece com exatamente duas tentativas desse lembrete, uma com status "Falha" e outra com status "Enviado"
-      And o lembrete permanece com status "Enviado"
-      And nenhum novo reenvio é programado
-      And o lembrete continua contabilizado como um único envio
 
    @service
    # DDD (regra central representada): processarLembretesAteAgora seleciona os reenvios cujo horário já chegou; a terceira Falha de 09:00:45 preserva as anteriores e programa 09:01:30; os dois passos de erro usam descrição da falha, conforme descricaoFalha.

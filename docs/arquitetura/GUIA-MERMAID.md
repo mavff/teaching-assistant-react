@@ -184,7 +184,7 @@ primeiro discuta com a equipe como cada informação deve ser representada.
 
 Um caminho de setas não prova que o cenário funciona. A análise do diagrama é
 conceitual; os testes da futura implementação precisam comprovar suas regras.
-O acompanhamento dos 24 cenários de lembretes está em
+O acompanhamento dos 23 cenários de lembretes está em
 [COBERTURA-CENARIOS.md](COBERTURA-CENARIOS.md), separando regras representadas,
 lacunas e resultados de descoberta dos testes.
 Esses cenários e suas marcações orientam a avaliação de completude do DDD desta
@@ -311,7 +311,7 @@ o relógio e não envia email. Somente `PeriodoAcademico` é acrescentado como e
 mantém a consulta dos seus próprios lembretes. `Services` coordena a operação,
 sem armazenar uma cópia do prazo em cada turma.
 
-Este incremento registra decisões de domínio aprovadas. Os 24 cenários atuais,
+Este incremento registra decisões de domínio aprovadas. Os 23 cenários atuais,
 seus comentários e a matriz de cobertura ainda precisam ser adequados ao prazo
 compartilhado; não são alterados nem considerados evidência dessa nova regra.
 Os testes unitários existentes de `Class` e JSON verificam a implementação
@@ -801,13 +801,13 @@ Exemplos para percorrer conceitualmente:
 | Situação inicial | Consulta e resultado esperado |
 | --- | --- |
 | Lembrete Enviado, com uma notificação de sucesso, é processado novamente | Retornar verdadeiro; encerrar sem email ou outra tentativa; preservar a notificação existente. |
-| Lembrete Enviado, com uma falha e um sucesso registrados, recebe reenvio atrasado | Retornar verdadeiro; preservar os dois registros; não enviar, registrar terceira tentativa ou programar novo reenvio. |
+| Lembrete Enviado, com uma falha e um sucesso registrados, passa por nova verificação do agendador | Retornar verdadeiro; preservar os dois registros; não enviar, registrar terceira tentativa ou programar novo reenvio. |
 | Lembrete não está Enviado | Retornar falso; a consulta não altera o estado ou o histórico e não realiza envio por conta própria. |
 
-Esses percursos explicitam a regra dos cenários service "Prevenção de envio
-duplicado por reprocessamento de lembrete já enviado" e "Bloqueio de novo reenvio
-após sucesso de tentativa anterior". Não são testes executáveis aprovados e não
-validam navegação GUI.
+Esses percursos ilustram a proteção do cenário de serviço
+"Prevenção de envio duplicado por reprocessamento de lembrete já enviado".
+O cenário "Reenvio automático após falha temporária" descreve a transição para
+Enviado após um reenvio bem-sucedido e o fim da programação.
 
 A regra considera o estado do lembrete recebido pelo serviço. Carregamento,
 persistência e concorrência continuam pendentes: duas execuções podem observar
