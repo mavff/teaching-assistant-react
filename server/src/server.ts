@@ -97,9 +97,8 @@ const saveDataToFile = (
         year: classObj.getYear(),
         professor: classObj.getProfessor(),
         especificacaoDoCalculoDaMedia: classObj.getEspecificacaoDoCalculoDaMedia().toJSON(),
-        configuracaoLembretes: (
-          configuracoesParaSalvar.get(classObj.getClassId()) ?? classObj.obterConfiguracaoLembretes()
-        ).toJSON(), // Grava a proposta da turma ou sua configuração atual usando o método do modelo.
+        configuracaoLembretes: configuracoesParaSalvar.get(classObj.getClassId())?.toJSON()
+          ?? classObj.serializarLembretes(), // A proposta validada tem prioridade sobre a configuração atual.
         enrollments: classObj.getEnrollments().map(enrollment => ({
           studentCPF: enrollment.getStudent().getCPF(),
           evaluations: enrollment.getEvaluations().map(evaluation => evaluation.toJSON()),
@@ -191,8 +190,7 @@ const loadDataFromFile = (): void => {
             const classObj = new Class(classData.topic, periodo, EspecificacaoDoCalculoDaMedia.fromJSON(classData.especificacaoDoCalculoDaMedia)); // Associa a turma ao período já recuperado, sem copiar seu prazo.
             if (classData.professor) classObj.definirProfessor(classData.professor);
 
-            configuracoesSalvas[index].listar().forEach(lembrete =>
-              classObj.obterConfiguracaoLembretes().add(lembrete)); // Recupera identidades, estados e agendamentos históricos.
+            classObj.restaurarLembretes(configuracoesSalvas[index].listar()); // Recupera identidades, estados e agendamentos históricos.
 
             classes.addClass(classObj);
 
@@ -297,11 +295,10 @@ app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
     const novoPrazo = new Date(prazoInformado);
     const instanteAtual = new Date(); // O servidor fornece um único instante para toda a operação.
 
-    const configuracoes = classes.getAllClasses()
-      .filter(turma => turma.getYear() === ano && turma.getSemester() === semestre)
-      .map(turma => turma.obterConfiguracaoLembretes()); // Confere os lembretes de todas as turmas afetadas pelo prazo.
+    const turmasDoPeriodo = classes.getAllClasses()
+      .filter(turma => turma.getYear() === ano && turma.getSemester() === semestre);
 
-    candidato.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoes); // Reutiliza as regras de datas e conflitos do domínio.
+    candidato.definirPrazoAcademico(novoPrazo, instanteAtual, turmasDoPeriodo); // Reutiliza as regras de datas e conflitos do domínio.
 
     const propostaDeGravacao = new Map(periodosAcademicos);
     propostaDeGravacao.set(identificador, candidato); // Prepara os dados que serão gravados, preservando o estado atual.
@@ -311,7 +308,7 @@ app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
     }
 
     if (anterior) {
-      anterior.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoes); // Atualiza o objeto compartilhado após a gravação.
+      anterior.definirPrazoAcademico(novoPrazo, instanteAtual, turmasDoPeriodo); // Atualiza o objeto compartilhado após a gravação.
     } else {
       periodosAcademicos.set(identificador, candidato); // Disponibiliza o novo período após a gravação.
     }
@@ -326,10 +323,56 @@ app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
   }
 });
 
+app.get('/api/notificacoes/historico', (_req: Request, res: Response) => {
+  const registros = historicoLembretes.listar()
+    .sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime() || b.id - a.id)
+    .flatMap(({ id, turmaRegistrada, dataHora, motivo, resultado }) => {
+      // A aba apresenta todos os resultados registrados pelo agendador da turma.
+      if (turmaRegistrada === null) {
+        return [];
+      }
+
+      return [{
+        id,
+        origem: 'lembrete',
+        contexto: turmaRegistrada,
+        dataHora: dataHora.toISOString(),
+        motivo,
+        resultado
+      }];
+    });
+
+  res.json(registros);
+});
+
+app.get('/api/notificacoes/historico/:id', (req: Request, res: Response) => {
+  const id = /^[1-9]\d*$/.test(req.params.id) ? Number(req.params.id) : NaN;
+  const registro = Number.isSafeInteger(id) ? historicoLembretes.buscar(id) : undefined;
+
+  if (!registro || registro.turmaRegistrada === null) {
+    res.status(404).json({ error: 'Notificação não encontrada' });
+    return;
+  }
+
+  // A consulta devolve o contexto guardado na tentativa.
+  res.json({
+    id: registro.id,
+    origem: 'lembrete',
+    contexto: registro.turmaRegistrada,
+    dataHora: registro.dataHora.toISOString(),
+    motivo: registro.motivo,
+    resultado: registro.resultado,
+    destinatario: registro.nomeDestinatario,
+    descricaoFalha: registro.descricaoFalha,
+    prazoRegistrado: registro.prazoRegistrado?.toISOString() ?? null,
+    pendenciasRegistradas: registro.pendenciasRegistradas
+  });
+});
+
 const apresentarConfiguracaoLembretes = (turma: Class) => ({
   turmaId: turma.getClassId(),
   prazoAcademico: turma.getPrazoAcademico()?.toISOString() ?? null,
-  lembretes: turma.obterConfiguracaoLembretes().toJSON()
+  lembretes: turma.serializarLembretes()
 });
 
 app.get('/api/classes/:id/lembretes', (req: Request, res: Response) => {
@@ -357,10 +400,8 @@ app.put('/api/classes/:id/lembretes', (req: Request, res: Response) => {
       id: item.id, data: item.data, horario: item.horario
     })); // Descarta campos que tentariam alterar estado, motivo ou reenvio pela GUI.
 
-    const atual = turma.obterConfiguracaoLembretes();
-    const candidata = new ConfiguracaoLembretes(atual.listar());
     const instanteAtual = new Date(); // Usa o relógio do servidor para toda a operação.
-    candidata.atualizar(quantidade, propostas, instanteAtual, prazo); // Valida a cópia sem alterar a configuração atual.
+    const candidata = turma.prepararConfiguracaoLembretes(quantidade, propostas, instanteAtual, prazo);
 
     if (quantidade > 0 && classes.obterEmailDasTurmas() === null) {
       return res.status(400).json({
@@ -373,7 +414,7 @@ app.put('/api/classes/:id/lembretes', (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Não foi possível salvar os lembretes' });
     }
 
-    atual.atualizar(quantidade, propostas, instanteAtual, prazo); // Publica a mesma proposta somente depois da gravação.
+    turma.atualizarLembretes(quantidade, propostas, instanteAtual, prazo); // Aplica a proposta depois da gravação.
     res.json(apresentarConfiguracaoLembretes(turma));
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
@@ -784,7 +825,10 @@ app.get('/api/classes/:classId/report', (req: Request, res: Response) => {
 
 
 // Groups, monitors and the notifications sent when a group changes
-const services = new Services();
+// Grupos: o e-mail de cada aluno vem do cadastro de alunos (o primeiro com o mesmo nome).
+const services = new Services({
+  emailDoAluno: nome => studentSet.getAllStudents().find(aluno => aluno.name === nome)?.email || undefined
+});
 app.use('/api', grupoRoutes(services));
 
 // Final results sent by e-mail

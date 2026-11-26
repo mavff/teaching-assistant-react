@@ -11,7 +11,7 @@ export class Grupo {
 
   constructor(readonly nome: string, alunos: string[] = []) {
     if (!nome || !nome.trim()) {
-      throw new DomainError('Nome do grupo é obrigatório');
+      throw new DomainError('Group name is required');
     }
     this._alunos = [...alunos];
   }
@@ -36,10 +36,10 @@ export class Grupo {
 
   adicionarAluno(aluno: string): void {
     if (!aluno || !aluno.trim()) {
-      throw new DomainError('Nome do aluno é obrigatório');
+      throw new DomainError('Student name is required');
     }
     if (this._alunos.includes(aluno)) {
-      throw new DomainError('O aluno já pertence ao grupo');
+      throw new DomainError('The student is already in the group');
     }
     this._alunos.push(aluno);
   }
@@ -51,7 +51,7 @@ export class Grupo {
 
   removerMonitor(): void {
     if (!this._monitor) {
-      throw new DomainError('O grupo não possui monitor');
+      throw new DomainError('The group has no monitor');
     }
     this._monitor = null;
     this._alocacaoAutomatica = false;

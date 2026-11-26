@@ -1,8 +1,10 @@
 import request from 'supertest';
-import { app, classes, periodosAcademicos } from '../server';
+import { app, classes, historicoLembretes, periodosAcademicos } from '../server';
 import { Class } from '../models/Class';
+import { EmailSenderSmtp } from '../models/EmailSender';
 import { Lembrete } from '../models/Lembrete';
 import { PeriodoAcademico } from '../models/PeriodoAcademico';
+import { Student } from '../models/Student';
 import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from '../models/EspecificacaoDoCalculoDaMedia';
 
 /**
@@ -55,40 +57,47 @@ describe('API de configuração de lembretes', () => {
   });
 
   test('rejeita a criação após o prazo e preserva o lembrete enviado', async () => {
-    // Given: o semestre já encerrou e a turma tem um único lembrete enviado.
     jest.useFakeTimers({
       now: new Date('2099-09-01T08:00:00-03:00'),
       doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout']
-    });
+    }); // Given: o relógio já passou do prazo da turma de teste.
+
+    const enviarEmail = jest.spyOn(EmailSenderSmtp.prototype, 'send')
+      .mockResolvedValue({ aceito: true }); // Registra qualquer chamada ao transporte, sem enviar um e-mail real.
 
     try {
       const turma = classes.findClassById('ESS-2099-2');
       if (!turma) throw new Error('Turma de teste não encontrada');
 
+      classes.definirEmailDasTurmas('paulo.borba@example.com');
+      turma.addEnrollment(new Student('João da Silva', '12345678901', 'joao@example.test')); // Given: há notas pendentes.
+
       const agendamentoEnviado = proposta.lembretes[0];
       const enviado = new Lembrete({ ...agendamentoEnviado, estado: 'Enviado' });
-      turma.obterConfiguracaoLembretes().add(enviado);
+      turma.obterConfiguracaoLembretes().add(enviado); // Given: a turma tem um único lembrete, já enviado.
 
       const anterior = await request(app).get(rota).expect(200);
+      const historicoAnterior = historicoLembretes.toJSON(); // Guarda o histórico antes da solicitação.
 
-      // When: solicita um novo lembrete para as 09h de Brasília e mantém o enviado na proposta.
       const rejeitada = await request(app).put(rota).send({
         quantidade: 2,
         lembretes: [
           agendamentoEnviado,
           { id: 'novo-apos-prazo', data: '2099-09-01', horario: '12:00' }
         ]
-      });
+      }); // When: solicita um novo lembrete para 09h de Brasília.
 
-      // Then: a API rejeita a criação e devolve a mesma configuração na consulta seguinte.
       expect(rejeitada.status).toBe(400);
-      expect(rejeitada.body.error).toBe('Prazo acadêmico encerrado');
+      expect(rejeitada.body.error).toBe('Prazo acadêmico encerrado'); // Then: confirma o motivo da rejeição.
 
       const consulta = await request(app).get(rota).expect(200);
       expect(consulta.body).toEqual(anterior.body);
-      expect(consulta.body.lembretes).toEqual([enviado.toJSON()]);
+      expect(consulta.body.lembretes).toEqual([enviado.toJSON()]); // Then: só o lembrete anterior continua na turma.
+      expect(enviarEmail).not.toHaveBeenCalled(); // Then: a solicitação não acionou o transporte.
+      expect(historicoLembretes.toJSON()).toEqual(historicoAnterior); // Then: nenhuma tentativa foi acrescentada.
     } finally {
-      jest.useRealTimers(); // Restaura o relógio mesmo se uma verificação falhar.
+      enviarEmail.mockRestore();
+      jest.useRealTimers();
     }
   });
 

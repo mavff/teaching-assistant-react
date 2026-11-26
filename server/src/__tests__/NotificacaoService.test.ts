@@ -16,8 +16,7 @@ describe('Processamento do lembrete de notas pendentes', () => {
     jest.useRealTimers();
   });
 
-  test('envia o aviso, registra a tentativa e marca o lembrete como enviado', async () => {
-    // Given: o relógio chegou ao agendamento e o transporte aceita o e-mail.
+  test('envia o aviso uma vez mesmo se o lembrete for reprocessado', async () => {
     const instante = new Date('2026-08-25T09:00:00-03:00');
     const prazo = new Date('2026-08-31T23:59:00-03:00');
     jest.useFakeTimers({ now: instante });
@@ -45,10 +44,8 @@ describe('Processamento do lembrete de notas pendentes', () => {
       emailSender: { send }
     });
 
-    // When: o servidor processa o agendamento de 09h de Brasília, armazenado como 12h UTC.
-    const [tentativa] = await servico.processarAgendados(turma.getClassId(), '2026-08-25', '12:00');
+    const [tentativa] = await servico.processarAgendados(turma.getClassId(), '2026-08-25', '12:00'); // Given: o envio das 09h é aceito.
 
-    // Then: o aviso, o histórico e o estado da turma correspondem à mesma tentativa.
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith(destinatario, 'Notas pendentes — 2026.2 de ESS', [
       'Olá,',
@@ -75,9 +72,18 @@ describe('Processamento do lembrete de notas pendentes', () => {
       { nomeAluno: 'João da Silva', meta: 'Tests' },
       { nomeAluno: 'Maria Souza', meta: 'Tests' }
     ]);
-    expect(configuracao.listar().map(lembrete => ({
-      id: lembrete.getId(), estado: lembrete.getEstado()
-    }))).toEqual([{ id: 'lembrete-1', estado: 'Enviado' }]);
+    const lembretesAposEnvio = configuracao.toJSON();
+    expect(lembretesAposEnvio).toEqual([
+      expect.objectContaining({ id: 'lembrete-1', estado: 'Enviado' })
+    ]); // Given: existe um único lembrete enviado antes da nova rodada.
+
+    jest.setSystemTime(new Date('2026-08-25T09:01:00-03:00'));
+    const novosRegistros = await servico.processarLembretesAteAgora(); // When: executa a operação que o agendador usa às 09h01.
+
+    expect(novosRegistros).toEqual([]);
+    expect(send).toHaveBeenCalledTimes(1); // Then: só houve a chamada das 09h.
+    expect(historico.listar()).toEqual([tentativa]); // Then: o histórico continua com uma única tentativa.
+    expect(configuracao.toJSON()).toEqual(lembretesAposEnvio); // Then: o único lembrete continua Enviado.
   });
 
   test('ignora o lembrete sem pendências e preserva a última tentativa de envio', async () => {

@@ -8,11 +8,12 @@ import StudentForm from './components/StudentForm';
 import Evaluations from './components/Evaluations';
 import Classes from './components/Classes';
 import Grupos from './components/Grupos';
+import NotificationHistory from './components/NotificationHistory';
 import ResultadosFinais from './components/ResultadosFinais';
 import AcademicPeriodSettings from './components/AcademicPeriodSettings';
 import './App.css';
 
-type TabType = 'students' | 'evaluations' | 'classes' | 'groups' | 'results';
+type TabType = 'students' | 'evaluations' | 'classes' | 'groups' | 'notification-history' | 'results';
 
 const App: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -150,6 +151,14 @@ const App: React.FC = () => {
             Classes
           </button>
           <button
+            className={`tab-button ${activeTab === 'notification-history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('notification-history')}
+            aria-pressed={activeTab === 'notification-history'}
+            data-testid="notification-history-tab"
+          >
+            Histórico de notificações
+          </button>
+          <button
             className={`tab-button ${activeTab === 'groups' ? 'active' : ''}`}
             onClick={() => setActiveTab('groups')}
             data-testid="groups-tab"
@@ -236,6 +245,7 @@ const App: React.FC = () => {
             </>
           )}
 
+          {activeTab === 'notification-history' && <NotificationHistory />}
           {activeTab === 'groups' && <Grupos />}
 
           {activeTab === 'results' && <ResultadosFinais />}

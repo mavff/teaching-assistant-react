@@ -24,7 +24,8 @@ export class NotificacaoService {
 
   constructor(
     private readonly historico: HistoricoNotificacoes,
-    private readonly emailSender: EmailSender,
+    // O envio de grupos pode ser real (assíncrono) ou simulado.
+    private readonly emailSender: EmailSender | Pick<EmailSenderSmtp, 'send'>,
     private readonly lembretes?: DependenciasLembretes
   ) {}
 
@@ -109,7 +110,7 @@ export class NotificacaoService {
 
       let horario = proximaRodadaRegular;
       for (const turma of dependencias.classes.getAllClasses()) {
-        for (const lembrete of turma.obterConfiguracaoLembretes().listar()) {
+        for (const lembrete of turma.listarLembretes()) {
           const estado = lembrete.getEstado();
           if (estado !== 'Não enviado' && estado !== 'Agendado') continue;
           const agendamento = lembrete.getProximoReenvioEm()?.getTime();
@@ -189,7 +190,7 @@ export class NotificacaoService {
     const registros: Notificacao[] = [];
 
     for (const turma of dependencias.classes.getAllClasses()) {
-      for (const lembrete of turma.obterConfiguracaoLembretes().listar()) {
+      for (const lembrete of turma.listarLembretes()) {
         const proximoReenvio = lembrete.getProximoReenvioEm();
         if (somenteReenvios && proximoReenvio === null) continue;
         const agendamento = proximoReenvio ?? lembrete.getAgendamento();
@@ -210,7 +211,7 @@ export class NotificacaoService {
     if (!turma) throw new Error('Turma não encontrada');
 
     // Data e horário localizam o agendamento original em UTC.
-    const agendados = turma.obterConfiguracaoLembretes().buscarLembretesPara(data, horario);
+    const agendados = turma.buscarLembretesPorDataEHorario(data, horario);
     if (agendados.length === 0) throw new Error('Não existe lembrete para o agendamento informado');
 
     const registros: Notificacao[] = [];
@@ -264,7 +265,7 @@ export class NotificacaoService {
         this.cancelarReenvio(turma, lembreteId, motivo);
         return [];
       }
-      turma.obterConfiguracaoLembretes().ignorar(lembreteId, motivo);
+      turma.ignorarLembrete(lembreteId, motivo);
 
       // Ignorado registra o processamento sem contar como tentativa de envio.
       const registro = new Notificacao(
@@ -300,9 +301,8 @@ export class NotificacaoService {
     );
 
     this.historico.registrar(tentativa);
-    const configuracao = turma.obterConfiguracaoLembretes();
     if (resultado.aceito) {
-      configuracao.marcarComoEnviado(lembreteId);
+      turma.marcarLembreteComoEnviado(lembreteId);
       return [tentativa];
     }
 
@@ -314,19 +314,30 @@ export class NotificacaoService {
       return [tentativa];
     }
 
-    configuracao.programarReenvio(lembreteId, new Date(Date.now() + espera));
+    turma.programarReenvioDeLembrete(lembreteId, new Date(Date.now() + espera));
     return [tentativa];
   }
 
   private cancelarReenvio(turma: Class, lembreteId: string, motivo: string): void {
-    turma.obterConfiguracaoLembretes().cancelar(lembreteId, motivo);
+    turma.cancelarReenvioDeLembrete(lembreteId, motivo);
     this.cancelamentoPendenteDeGravacao = true;
   }
 
-  /** Notifica cada destinatário sobre uma mudança na composição de um grupo. */
-  notificarGrupo(grupo: string, motivo: string, destinatarios: string[], conteudo: string): Notificacao[] {
-    return destinatarios.map(destinatario => {
-      const envio = this.emailSender.send(destinatario, `${motivo} - ${grupo}`, conteudo);
+  /**
+   * Notifica cada destinatário sobre uma mudança na composição de um grupo.
+   * O e-mail vai para o endereço informado por enderecoDe; o histórico guarda o nome.
+   * Os envios são feitos um de cada vez, na ordem dos destinatários.
+   */
+  async notificarGrupo(
+    grupo: string,
+    motivo: string,
+    destinatarios: string[],
+    conteudo: string,
+    enderecoDe: (destinatario: string) => string = destinatario => destinatario
+  ): Promise<Notificacao[]> {
+    const notificacoes: Notificacao[] = [];
+    for (const destinatario of destinatarios) {
+      const envio = await this.emailSender.send(enderecoDe(destinatario), `${motivo} - ${grupo}`, conteudo);
       const notificacao = new Notificacao(
         this.historico.proximoId(),
         destinatario,
@@ -337,7 +348,8 @@ export class NotificacaoService {
         envio.descricaoFalha
       );
       this.historico.registrar(notificacao);
-      return notificacao;
-    });
+      notificacoes.push(notificacao);
+    }
+    return notificacoes;
   }
 }

@@ -58,7 +58,7 @@ export class ConfiguracaoLembretes {
     return lembrete;
   }
 
-  buscarLembretesPara(data: string, horario: string): Lembrete[] {
+  buscarLembretesPorDataEHorario(data: string, horario: string): Lembrete[] {
     return this.lembretes
       .filter(lembrete => lembrete.getData() === data && lembrete.getHorario() === horario)
       .map(lembrete => lembrete.copiar()); // Datas iguais não tornam identidades diferentes duplicadas; a busca não filtra estados.

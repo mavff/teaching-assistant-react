@@ -7,7 +7,7 @@ export class Grupos {
 
   adicionar(grupo: Grupo): Grupo {
     if (this.grupos.has(grupo.nome)) {
-      throw new DomainError('Grupo já existe');
+      throw new DomainError('Group already exists');
     }
     this.grupos.set(grupo.nome, grupo);
     return grupo;
@@ -26,6 +26,11 @@ export class Grupos {
     const alocados = new Set<string>();
     this.grupos.forEach(g => g.monitor && alocados.add(g.monitor));
     return alocados;
+  }
+
+  /** Grupo do qual o aluno faz parte, se houver (um aluno pertence a um único grupo). */
+  grupoDoAluno(aluno: string): Grupo | undefined {
+    return this.listar().find(g => g.alunos.includes(aluno));
   }
 
   /** Grupos dos quais o monitor é responsável (pode ser mais de um). */

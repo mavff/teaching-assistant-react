@@ -2,6 +2,7 @@ import { Student } from './Student';
 import { Enrollment } from './Enrollment';
 import { EspecificacaoDoCalculoDaMedia } from './EspecificacaoDoCalculoDaMedia';
 import { ConfiguracaoLembretes } from './ConfiguracaoLembretes';
+import type { Lembrete, LembreteProposto } from './Lembrete';
 import { PeriodoAcademico } from './PeriodoAcademico';
 import { EVALUATION_GOALS } from './Evaluation';
 
@@ -42,6 +43,62 @@ export class Class {
 
   obterConfiguracaoLembretes(): ConfiguracaoLembretes {
     return this.configuracaoLembretes; // Permite acessar os lembretes da turma pelas operações da configuração.
+  }
+
+  buscarLembretesPorDataEHorario(data: string, horario: string): Lembrete[] {
+    return this.configuracaoLembretes.buscarLembretesPorDataEHorario(data, horario);
+  }
+
+  listarLembretes(): Lembrete[] {
+    return this.configuracaoLembretes.listar();
+  }
+
+  marcarLembreteComoEnviado(id: string): void {
+    this.configuracaoLembretes.marcarComoEnviado(id);
+  }
+
+  ignorarLembrete(id: string, motivo: string): void {
+    this.configuracaoLembretes.ignorar(id, motivo);
+  }
+
+  programarReenvioDeLembrete(id: string, dataHora: Date): void {
+    this.configuracaoLembretes.programarReenvio(id, dataHora);
+  }
+
+  cancelarReenvioDeLembrete(id: string, motivo: string): void {
+    this.configuracaoLembretes.cancelar(id, motivo);
+  }
+
+  serializarLembretes(): ReturnType<ConfiguracaoLembretes['toJSON']> {
+    return this.configuracaoLembretes.toJSON();
+  }
+
+  restaurarLembretes(lembretes: readonly Lembrete[]): void {
+    lembretes.forEach(lembrete => this.configuracaoLembretes.add(lembrete));
+  }
+
+  possuiAgendamentosPendentesApos(novoPrazo: Date): boolean {
+    return this.configuracaoLembretes.possuiAgendamentosPendentesApos(novoPrazo);
+  }
+
+  prepararConfiguracaoLembretes(
+    quantidade: number,
+    propostas: readonly LembreteProposto[],
+    instanteAtual: Date,
+    prazo: Date
+  ): ConfiguracaoLembretes {
+    const candidata = new ConfiguracaoLembretes(this.listarLembretes());
+    candidata.atualizar(quantidade, propostas, instanteAtual, prazo);
+    return candidata;
+  }
+
+  atualizarLembretes(
+    quantidade: number,
+    propostas: readonly LembreteProposto[],
+    instanteAtual: Date,
+    prazo: Date
+  ): void {
+    this.configuracaoLembretes.atualizar(quantidade, propostas, instanteAtual, prazo);
   }
 
   getPrazoAcademico(): Date | null {

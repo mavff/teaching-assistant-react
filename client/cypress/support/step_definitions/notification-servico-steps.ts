@@ -1,5 +1,7 @@
 import { Given, When, Then } from '@badeball/cypress-cucumber-preprocessor';
-import { comGrupo, comNotificacoes, destinatarios, monitoresLivres, requisitar, tipoDaNotificacao } from '../grupos-api';
+import {
+  cadastrarMonitor, comGrupo, comNotificacoes, destinatarios, monitoresLivres, requisitar, tipoDaNotificacao
+} from '../grupos-api';
 
 // Cenários de serviço: exercitam o servidor pela API, sem nenhum elemento da interface.
 // Os Given são compartilhados com os cenários de GUI (notification-steps.ts).
@@ -16,7 +18,19 @@ Given('o monitor {string} não está cadastrado', (monitor: string) => {
   });
 });
 
+Given('o monitor {string} está cadastrado com nome {string} e e-mail {string}', cadastrarMonitor);
+
 // ---------- When ----------
+When('eu peço ao sistema para criar o grupo {string} com os alunos {string} e {string}',
+  (nome: string, aluno1: string, aluno2: string) => {
+    pedir('POST', '/api/grupos', { nome, alunos: [aluno1, aluno2] });
+  });
+
+When('eu peço ao sistema para cadastrar o monitor {string} com nome {string} e e-mail {string}',
+  (login: string, nome: string, email: string) => {
+    pedir('POST', '/api/monitores', { login, nome, email });
+  });
+
 When('eu peço ao sistema para alocar o monitor {string} ao grupo {string}', (monitor: string, nome: string) => {
   pedir('POST', `/api/grupos/${nome}/monitor`, { monitor });
 });
@@ -66,6 +80,29 @@ Then('o sistema armazena apenas {string}, {string} e {string} como alunos do gru
   (a1: string, a2: string, a3: string, nome: string) => {
     comGrupo(nome, g => expect([...g.alunos].sort()).to.deep.equal([a1, a2, a3].sort()));
   });
+
+Then('o sistema armazena apenas {string} e {string} como alunos do grupo {string}',
+  (a1: string, a2: string, nome: string) => {
+    comGrupo(nome, g => expect([...g.alunos].sort()).to.deep.equal([a1, a2].sort()));
+  });
+
+const comMonitor = (login: string, verificar: (m: { nome: string; email: string; situacao: string }) => void) =>
+  requisitar('GET', '/api/monitores/situacao').its('body')
+    .then((lista: { login: string; nome: string; email: string; situacao: string }[]) => {
+      const monitor = lista.find(m => m.login === login);
+      expect(monitor, `monitor ${login}`).to.exist;
+      verificar(monitor!);
+    });
+
+Then('o sistema armazena o monitor {string} com nome {string} e e-mail {string}',
+  (login: string, nome: string, email: string) => {
+    comMonitor(login, m => expect({ nome: m.nome, email: m.email }).to.deep.equal({ nome, email }));
+  });
+
+Then('o sistema mostra o monitor {string} como livre', (login: string) => {
+  comMonitor(login, m => expect(m.situacao).to.equal('livre'));
+  monitoresLivres().should('include', login);
+});
 
 Then('o sistema não tem monitores livres', () => {
   monitoresLivres().should('deep.equal', []);

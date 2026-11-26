@@ -184,7 +184,7 @@ primeiro discuta com a equipe como cada informação deve ser representada.
 
 Um caminho de setas não prova que o cenário funciona. A análise do diagrama é
 conceitual; os testes da futura implementação precisam comprovar suas regras.
-O acompanhamento dos 25 cenários de lembretes está em
+O acompanhamento dos 23 cenários de lembretes está em
 [COBERTURA-CENARIOS.md](COBERTURA-CENARIOS.md), separando regras representadas,
 lacunas e resultados de descoberta dos testes.
 Esses cenários e suas marcações orientam a avaliação de completude do DDD desta
@@ -311,7 +311,7 @@ o relógio e não envia email. Somente `PeriodoAcademico` é acrescentado como e
 mantém a consulta dos seus próprios lembretes. `Services` coordena a operação,
 sem armazenar uma cópia do prazo em cada turma.
 
-Este incremento registra decisões de domínio aprovadas. Os 25 cenários atuais,
+Este incremento registra decisões de domínio aprovadas. Os 23 cenários atuais,
 seus comentários e a matriz de cobertura ainda precisam ser adequados ao prazo
 compartilhado; não são alterados nem considerados evidência dessa nova regra.
 Os testes unitários existentes de `Class` e JSON verificam a implementação
@@ -361,17 +361,17 @@ Prazo acadêmico encerrado; cancelar não remove o lembrete nem altera o histór
 
 ### Localização dos lembretes por agendamento
 
-`ConfiguracaoLembretes.buscarLembretesPara(data, horario)` retorna uma lista dos
-lembretes com exatamente aquela data e horário, restrita à configuração consultada.
+`Class.buscarLembretesPorDataEHorario(data, horario)` delega a busca à configuração
+da turma. A configuração retorna cópias dos lembretes com a data e o horário
+originais informados.
 É uma consulta: preserva objetos, estados e histórico, sem criar lembrete ou
 solicitar email. A lista pode estar vazia ou conter vários lembretes; não foi
 definida uma regra de exclusividade de data e horário. A busca não filtra estados
 nem unifica `Não enviado` com `Agendado`.
 
 `NotificaçãoService.processarAgendados(turma, data, horario)` é a entrada conceitual
-para uma solicitação por turma e agendamento. Pelas associações existentes com
-`Classes`, suas turmas e configurações, o serviço acessa a configuração da turma
-indicada e realiza a consulta. Não é necessário acrescentar relações ao diagrama.
+para uma solicitação por turma e agendamento. O serviço localiza a turma em
+`Classes` e chama `buscarLembretesPorDataEHorario(data, horario)` na própria turma.
 
 | Resultado da busca | Coordenação esperada |
 | --- | --- |
@@ -695,22 +695,18 @@ O cenário **Visualização do histórico de notificações** considera um únic
 professor utilizando a funcionalidade, com suas turmas disponíveis. Seu ponto
 inicial é a tela Turmas, sem autenticação ou registros de outros professores.
 
-`HistoricoNotificacoes.listar()` retorna as notificações registradas, incluindo
-Enviado, Falha e Ignorado. Consultas de tentativas consideram apenas Enviado e
-Falha; o registro Ignorado não é contado como tentativa. `Services.consultarHistorico()`, já presente no diagrama,
-coordena essa operação pela associação com `HistoricoNotificacoes`. A composição
-com `Notificacao` representa os registros que fornecem nome do destinatário,
-turma, data/hora, motivo e resultado para apresentação.
+`HistoricoNotificacoes.listar()` retorna os registros Enviado, Falha e Ignorado.
+Enviado e Falha representam tentativas de envio. A rota `GET /api/notificacoes/historico`
+consulta `HistoricoNotificacoes.listar()` no histórico de lembretes. A tabela mostra
+os registros Enviado, Falha e Ignorado, com a turma e os dados registrados na época.
 
 A consulta preserva todos os registros, seus identificadores e estados. Não
 solicita email, executa reenvio ou recalcula os dados históricos a partir da turma
 atual. A filtragem, as pendências históricas e o prazo registrado nos detalhes
 são descritos a seguir.
 
-Os métodos de apresentação e navegação do cliente não são necessários para
-esta validação de domínio. Conforme aprovado, as classes do cliente, Email Service,
-Interface e suas ligações permanecem inalteradas. O método `listar()` fica visível
-na classe responsável do servidor, com as relações de acesso já existentes.
+A aba do cliente consulta a API ao abrir e mostra a data e hora no fuso de Brasília,
+do registro mais recente para o mais antigo.
 
 ### Filtragem por disciplina e turma com os dados existentes
 
@@ -801,13 +797,13 @@ Exemplos para percorrer conceitualmente:
 | Situação inicial | Consulta e resultado esperado |
 | --- | --- |
 | Lembrete Enviado, com uma notificação de sucesso, é processado novamente | Retornar verdadeiro; encerrar sem email ou outra tentativa; preservar a notificação existente. |
-| Lembrete Enviado, com uma falha e um sucesso registrados, recebe reenvio atrasado | Retornar verdadeiro; preservar os dois registros; não enviar, registrar terceira tentativa ou programar novo reenvio. |
+| Lembrete Enviado, com uma falha e um sucesso registrados, passa por nova verificação do agendador | Retornar verdadeiro; preservar os dois registros; não enviar, registrar terceira tentativa ou programar novo reenvio. |
 | Lembrete não está Enviado | Retornar falso; a consulta não altera o estado ou o histórico e não realiza envio por conta própria. |
 
-Esses percursos explicitam a regra dos cenários service "Prevenção de envio
-duplicado por reprocessamento de lembrete já enviado" e "Bloqueio de novo reenvio
-após sucesso de tentativa anterior". Não são testes executáveis aprovados e não
-validam navegação GUI.
+Esses percursos ilustram a proteção do cenário de serviço
+"Prevenção de envio duplicado por reprocessamento de lembrete já enviado".
+O cenário "Reenvio automático após falha temporária" descreve a transição para
+Enviado após um reenvio bem-sucedido e o fim da programação.
 
 A regra considera o estado do lembrete recebido pelo serviço. Carregamento,
 persistência e concorrência continuam pendentes: duas execuções podem observar

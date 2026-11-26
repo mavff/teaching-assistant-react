@@ -8,8 +8,28 @@ const apiUrl = () => Cypress.env('apiUrl') as string;
 export const requisitar = (method: string, caminho: string, body?: object) =>
   cy.request({ method, url: `${apiUrl()}${caminho}`, body, failOnStatusCode: false });
 
-export const cadastrarMonitor = (login: string) =>
-  requisitar('POST', '/api/monitores', { login }).its('status').should('eq', 201);
+/** Sem nome e e-mail informados no cenário, usa o login como nome e um e-mail derivado dele. */
+export const cadastrarMonitor = (login: string, nome = login, email = `${login}@cin.ufpe.br`) =>
+  requisitar('POST', '/api/monitores', { login, nome, email }).its('status').should('eq', 201);
+
+// Alunos criados pelos cenários na aba Students; removidos ao fim de cada cenário
+// para não deixar dados de teste no cadastro de alunos.
+const alunosCriados: string[] = [];
+
+export const cadastrarAluno = (nome: string) => {
+  const cpf = String(90000000000 + Math.floor(Math.random() * 9999999999)).slice(0, 11);
+  return requisitar('POST', '/api/students', { name: nome, cpf, email: `aluno${cpf}@teste.com` })
+    .then(resposta => {
+      expect(resposta.status, `cadastro do aluno ${nome}`).to.equal(201);
+      alunosCriados.push(cpf);
+    });
+};
+
+export const removerAlunosCriados = () => {
+  while (alunosCriados.length) {
+    requisitar('DELETE', `/api/students/${alunosCriados.pop()}`);
+  }
+};
 
 export const criarGrupo = (nome: string, alunos: string[]) =>
   requisitar('POST', '/api/grupos', { nome, alunos }).its('status').should('eq', 201);

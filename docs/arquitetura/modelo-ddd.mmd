@@ -53,6 +53,14 @@ namespace Servidor {
     consultarHistorico()
     filtrarHistorico(disciplina, turma)
     consultarDetalhesNotificacao(idNotificacao)
+    criarGrupo(nome, alunos)
+    cadastrarMonitor(login, nome, email)
+    alocarMonitor(grupo, monitor)
+    alocarAutomaticamente(grupo)
+    realocarMonitor(grupo, monitor, destino)
+    removerMonitor(grupo)
+    adicionarAluno(grupo, aluno)
+    situacaoDosMonitores()
   }
   class StudentListImport["StudentList Import"]
   class StudentList {
@@ -76,6 +84,17 @@ namespace Servidor {
     semester
     obterPeriodoAcademico() PeriodoAcademico
     obterConfiguracaoLembretes() ConfiguracaoLembretes
+    buscarLembretesPorDataEHorario(data, horario) Lembrete[]
+    listarLembretes() Lembrete[]
+    marcarLembreteComoEnviado(id)
+    ignorarLembrete(id, motivo)
+    programarReenvioDeLembrete(id, dataHora)
+    cancelarReenvioDeLembrete(id, motivo)
+    serializarLembretes()
+    restaurarLembretes(lembretes)
+    possuiAgendamentosPendentesApos(novoPrazo) boolean
+    prepararConfiguracaoLembretes(quantidade, propostas, instanteAtual, prazo) ConfiguracaoLembretes
+    atualizarLembretes(quantidade, propostas, instanteAtual, prazo)
     identificarPendencias()
   }
   class PeriodoAcademico {
@@ -83,7 +102,11 @@ namespace Servidor {
     semestre
     prazoAcademico
     prazoEncerrado(instanteAtual) boolean
-    definirPrazoAcademico(novoPrazo, instanteAtual, configuracoesDoPeriodo)
+    definirPrazoAcademico(novoPrazo, instanteAtual, consultasDoPeriodo)
+  }
+  class ConsultaDeAgendamentos {
+    <<interface>>
+    possuiAgendamentosPendentesApos(novoPrazo) boolean
   }
   class Enrolment {
     getEvaluationForGoal(meta)
@@ -114,7 +137,7 @@ namespace Servidor {
     cancelar(id, motivo)
     atualizar(quantidade, lembretesPropostos, instanteAtual, prazoAcademico)
     possuiAgendamentosPendentesApos(novoPrazo) boolean
-    buscarLembretesPara(data, horario) Lembrete[]
+    buscarLembretesPorDataEHorario(data, horario) Lembrete[]
     listar() Lembrete[]
   }
   class Lembrete {
@@ -137,6 +160,7 @@ namespace Servidor {
     montarEmailNotasPendentes(turma, destinatario, prazoAcademico)
     processar(turma, Lembrete, dependencias)
     processarAgendados(turmaId, data, horario)
+    notificarGrupo(grupo, motivo, destinatarios, conteudo, enderecoDe)
   }
   class HistoricoNotificacoes {
     registrar(Notificacao)
@@ -151,6 +175,7 @@ namespace Servidor {
     lembreteId
     nomeDestinatario
     turmaRegistrada
+    grupoRegistrado
     dataHora
     resultado
     motivo
@@ -209,7 +234,8 @@ Services --> HistoricoNotificacoes
 %% PRAZO COMPARTILHADO: cada turma acessa o único período correspondente ao seu ano e semestre.
 Class "*" --> "1" PeriodoAcademico : período
 Services --> PeriodoAcademico
-PeriodoAcademico --> ConfiguracaoLembretes : valida pendências
+PeriodoAcademico ..> ConsultaDeAgendamentos : valida pendências
+Class ..|> ConsultaDeAgendamentos
 
 %% NOTIFICAÇÃO: objeto e ligações aprovados para este incremento.
 HistoricoNotificacoes *--> "*" Notificacao
@@ -258,14 +284,14 @@ HistoricoNotificacoes <-- NotificacaoService
 %% DEFINIÇÃO DO PRAZO: Services.definirPrazoAcademico(ano, semestre, novoPrazo) coordena o cadastro e a edição por período.
 %% Obter o único PeriodoAcademico correspondente ao ano e semestre, independentemente de haver turmas cadastradas.
 %% Classes.buscarPorPeriodo retorna todas e somente as Class desse ano e semestre, sem modificar dados.
-%% Services obtém a configuração de cada uma dessas turmas e fornece o conjunto completo em configuracoesDoPeriodo.
+%% Services fornece as turmas do período como consultas de agendamentos pendentes.
 %% Não receber essa lista do cliente nem validar apenas a turma que estiver aberta na interface.
-%% Consultar uma vez o relógio do servidor e chamar PeriodoAcademico.definirPrazoAcademico(novoPrazo, instanteAtual, configuracoesDoPeriodo).
+%% Consultar uma vez o relógio do servidor e chamar PeriodoAcademico.definirPrazoAcademico(novoPrazo, instanteAtual, consultasDoPeriodo).
 %% O professor informa ano, semestre e novo prazo; instanteAtual não vem do cliente nem é armazenado como atributo.
 %% Rejeitar uma data de prazo inválida com Prazo acadêmico inválido, sem modificar dados.
 %% Se novoPrazo for anterior a instanteAtual, rejeitar com Prazo acadêmico não pode ser anterior à data atual.
 %% A igualdade com instanteAtual é permitida, mas não dispensa a verificação dos agendamentos pendentes.
-%% Antes de alterar prazoAcademico, PeriodoAcademico consulta cada configuração recebida por possuiAgendamentosPendentesApos(novoPrazo).
+%% Antes de alterar prazoAcademico, PeriodoAcademico usa possuiAgendamentosPendentesApos(novoPrazo) em cada consulta recebida.
 %% Cada consulta considera seus Lembretes em Não enviado ou Agendado, sem unificar esses estados.
 %% Retornar verdadeiro se a data e horário originais de algum deles forem posteriores ao novo prazo
 %% ou se seu proximoReenvioEm estiver preenchido e for posterior ao novo prazo.
@@ -289,14 +315,14 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Não criar o novo Lembrete, não solicitar email e não registrar uma tentativa de envio.
 %% Esta regra de criação não define novas restrições para propostas sem novos lembretes.
 
-%% BUSCA POR AGENDAMENTO: buscarLembretesPara é uma consulta da ConfiguracaoLembretes da turma.
-%% Retornar todos os Lembretes cuja data e horário correspondem aos parâmetros, ou uma lista vazia.
+%% BUSCA POR AGENDAMENTO: Class.buscarLembretesPorDataEHorario delega a consulta à ConfiguracaoLembretes da turma.
+%% Retornar cópias dos Lembretes com a data e o horário originais informados, ou uma lista vazia.
 %% Preservar objetos, estados e histórico; não criar lembrete, não enviar email e não consultar o relógio.
 %% Não impor unicidade de data e horário nem filtrar ou unificar estados Não enviado, Agendado e Enviado.
 %% Lembretes de outras configurações não participam da consulta.
 
 %% ENTRADA POR AGENDAMENTO: processarAgendados usa a turma indicada, acessível por Classes,
-%% e consulta sua ConfiguracaoLembretes por buscarLembretesPara(data, horario).
+%% e chama buscarLembretesPorDataEHorario(data, horario) diretamente na turma.
 %% NotificacaoService verifica os agendamentos ao iniciar e a cada 30 segundos.
 %% Cada instância do serviço mantém um único intervalo e executa uma verificação por vez.
 %% processarLembretesAteAgora seleciona os horários alcançados. O envio continua sujeito ao prazo acadêmico.
@@ -381,7 +407,7 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Ao passar para Enviado, a operação também esvazia proximoReenvioEm, retirando o reenvio pendente.
 %% Preservar motivo, id, data e horário; não enviar email, registrar Notificacao ou programar outro reenvio.
 %% ConfiguracaoLembretes.marcarComoEnviado(id) localiza o lembrete armazenado e delega a transição à entidade.
-%% A marcação atualiza o registro da turma. listar e buscarLembretesPara devolvem cópias para consulta.
+%% A marcação atualiza o registro da turma. listar e buscarLembretesPorDataEHorario devolvem cópias para consulta.
 %% Após aceitação do email, NotificacaoService coordena registrar uma nova Notificacao Enviado
 %% e chamar marcarComoEnviado no mesmo Lembrete.
 %% Se uma tentativa válida falhar, o serviço coordena registrar uma nova Notificacao Falha,
@@ -450,8 +476,8 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Não enviado e Agendado não são unificados por este incremento.
 
 %% CONSULTA DA CONFIGURAÇÃO: Services.consultarConfiguracaoLembretes(turma) coordena a leitura da turma selecionada.
-%% Classes.buscar(turma) localiza a Class indicada; Class.obterConfiguracaoLembretes devolve sua configuração associada.
-%% ConfiguracaoLembretes.listar retorna todos os seus lembretes, com id, data, horário e estado, incluindo os Enviados.
+%% Classes.buscar(turma) localiza a Class indicada. Class.serializarLembretes delega a leitura à configuração.
+%% A leitura retorna todos os lembretes da turma, com id, data, horário e estado, incluindo os Enviados.
 %% Usar as relações existentes Services --> Classes, Classes *--> Class, Class --> ConfiguracaoLembretes
 %% e ConfiguracaoLembretes *--> Lembrete; para o prazo, usar Class --> PeriodoAcademico.
 %% Services devolve os lembretes, o prazoAcademico do período da Class e a quantidade calculada pelo total da lista.
@@ -473,10 +499,11 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Services.configurarLembretes(turma, quantidade, lembretesPropostos) continua sendo a entrada conceitual da aplicação.
 %% O serviço consulta o relógio do servidor uma vez por atualização e fornece instanteAtual.
 %% instanteAtual não é informado pelo professor nem armazenado como atributo da configuração.
-%% O prazo é obtido do período da mesma Class; a gravação integral em armazenamento continua pendente.
+%% O prazo é obtido do período da mesma Class. O servidor grava a proposta validada antes de aplicá-la em memória.
 
 %% CONTRATO DE SALVAMENTO: Services recebe a turma selecionada, a quantidade e a proposta do conjunto final.
-%% Localizar a Class por Classes.buscar(turma) e obter sua configuração por obterConfiguracaoLembretes().
+%% Localizar a Class por Classes.buscar(turma) e chamar prepararConfiguracaoLembretes para validar uma cópia.
+%% Após gravar a proposta, chamar Class.atualizarLembretes para aplicá-la à configuração armazenada.
 %% O serviço fornece o instante obtido do relógio e o prazoAcademico do período da mesma Class a atualizar.
 %% Usar as associações existentes com Classes, Class, PeriodoAcademico, ConfiguracaoLembretes e Lembrete.
 %% O retorno String contém a confirmação ou o motivo da rejeição previsto no cenário.
@@ -534,9 +561,12 @@ HistoricoNotificacoes <-- NotificacaoService
 %% HistoricoNotificacoes.listar retorna as Notificacoes registradas, com resultados Enviado, Falha e Ignorado.
 %% Consultas de tentativas de envio consideram somente resultados Enviado e Falha, sem incluir Ignorado na contagem ou na última tentativa.
 %% No cenário de ausência de envio, o registro Ignorado de 25/08 fica no histórico, mas a última tentativa continua Enviado de 20/08.
-%% Services.consultarHistorico coordena listar pela associação Services --> HistoricoNotificacoes.
+%% GET /api/notificacoes/historico lê o histórico de lembretes com HistoricoNotificacoes.listar().
+%% Services.consultarHistorico consulta o histórico de grupos.
 %% A composição HistoricoNotificacoes *--> Notificacao representa os registros devolvidos.
-%% A listagem disponibiliza nomeDestinatario, turmaRegistrada, dataHora, motivo e resultado registrados.
+%% A listagem apresenta os registros Enviado, Falha e Ignorado do agendador de lembretes.
+%% Cada linha da listagem identifica a origem do registro.
+%% Nos lembretes, o contexto apresentado é a turmaRegistrada.
 %% Preservar os ids, estados e todos os dados das notificações; consultar não envia email nem executa reenvio.
 %% Não selecionar por professor nem acrescentar sua entidade, identificador, autenticação ou controle de acesso.
 %% As classes do cliente, EmailService, Interface e suas relações permanecem inalteradas.
@@ -574,6 +604,19 @@ HistoricoNotificacoes <-- NotificacaoService
 %% Os cenários usam motivo tanto para o propósito do aviso quanto para a causa da falha.
 %% Essa diferença de linguagem precisa de validação; os cenários não são reinterpretados aqui.
 %% A relação de GradeNotification com EmailSender já existe na base.
+%% GRUPOS E MONITORES: representados apenas por métodos de Services, sem classes próprias neste diagrama.
+%% Services mantém os grupos (no máximo um monitor por grupo, alunos sem repetição) e o cadastro de monitores.
+%% Cada aluno pertence a um único grupo: criarGrupo e adicionarAluno recusam aluno que já está em outro grupo.
+%% Cada monitor tem login (identificação), nome e e-mail válido; o mesmo login não é cadastrado duas vezes.
+%% Um grupo que já tem monitor não recebe outro: o monitor atual é removido ou realocado antes.
+%% Um monitor pode acumular grupos; a realocação exige grupo de destino existente e sem monitor.
+%% Cada mudança bem-sucedida solicita NotificacaoService.notificarGrupo, que registra uma Notificacao por destinatário.
+%% grupoRegistrado identifica o grupo da notificação; nesse caso turmaRegistrada e lembreteId ficam vazios.
+%% Motivos de grupo: alocação, aviso (aluno adicionado), saída, entrada, remoção e acúmulo de grupos.
+%% Uma operação rejeitada não altera o grupo nem gera notificação.
+%% O e-mail vai ao endereço cadastrado: monitor pelo login, aluno pelo cadastro de alunos; sem endereço, o registro fica Falha.
+%% O envio real usa EmailSenderSmtp somente com NOTIFICACOES_GRUPO_EMAIL=smtp; sem isso, o envio é simulado.
+%% consultarHistorico continua sendo a consulta geral do histórico; para grupos, ela também aceita filtrar pelo grupoRegistrado.
 
 style Notificacao fill:#fff4cd,stroke:#93600c,stroke-width:2px
 note for Services "configurarLembretes reúne quantidade, datas e horários."
