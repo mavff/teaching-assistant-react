@@ -1,8 +1,5 @@
 import { ResultadoEnvio } from '../models/EmailSender';
 import { EmailSenderGrupos } from '../models/EmailSenderGrupos';
-import { Grupos } from '../models/Grupos';
-import { HistoricoNotificacoes } from '../models/HistoricoNotificacoes';
-import { Monitores } from '../models/Monitores';
 import { Services } from '../models/Services';
 
 /** Remetente falso no lugar do SMTP: anota os envios e recusa o que não é endereço de e-mail. */
@@ -66,7 +63,7 @@ describe('Proteção dos testes de aceitação contra o envio real', () => {
   it('Services.forcarEnvioSimulado impede o envio real das notificações de grupo', async () => {
     const smtp = remetenteFalso();
     const remetente = new EmailSenderGrupos({ NOTIFICACOES_GRUPO_EMAIL: 'smtp' }, () => smtp);
-    const services = new Services(new Grupos(), new Monitores(), new HistoricoNotificacoes(), remetente);
+    const services = new Services({ emailSender: remetente });
     services.cadastrarMonitor('joaosilva', 'João Silva', 'joao@cin.ufpe.br');
     services.criarGrupo('ESS-G3', []);
 
@@ -83,8 +80,7 @@ describe('Endereço de e-mail das notificações de grupo', () => {
 
   const criar = () => {
     const smtp = remetenteFalso();
-    const services = new Services(new Grupos(), new Monitores(), new HistoricoNotificacoes(), smtp, smtp,
-      nome => emails[nome]);
+    const services = new Services({ emailSender: smtp, gradeNotificationSender: smtp, emailDoAluno: nome => emails[nome] });
     services.cadastrarMonitor('joaosilva', 'João Silva', 'joao@cin.ufpe.br');
     return { services, smtp };
   };

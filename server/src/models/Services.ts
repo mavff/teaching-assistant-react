@@ -26,6 +26,21 @@ export interface SituacaoMonitor {
   alocacaoAutomatica: boolean;
 }
 
+type Remetente = EmailSender | Pick<EmailSenderSmtp, 'send'>;
+
+/** Dependências do Services; cada uma tem um padrão, então só se informa o que muda. */
+export interface OpcoesServices {
+  grupos?: Grupos;
+  monitores?: Monitores;
+  historico?: HistoricoNotificacoes;
+  /** Remetente das notificações de grupo. */
+  emailSender?: Remetente;
+  /** Remetente das notificações de nota. */
+  gradeNotificationSender?: Remetente;
+  /** E-mail de um aluno pelo nome, vindo do cadastro de alunos (aba Students). */
+  emailDoAluno?: (nome: string) => string | undefined;
+}
+
 /**
  * Serviços do servidor para grupos e monitores: coordena as coleções e solicita
  * ao NotificacaoService as notificações das mudanças bem-sucedidas.
@@ -34,24 +49,25 @@ export interface SituacaoMonitor {
 export class Services {
   readonly notificacaoService: NotificacaoService;
   readonly gradeNotificationService: GradeNotification;
-  readonly gradeNotificationSender: EmailSender | Pick<EmailSenderSmtp, 'send'>;
-  private readonly remetenteGrupos: EmailSender | Pick<EmailSenderSmtp, 'send'>;
+  readonly gradeNotificationSender: Remetente;
+  readonly grupos: Grupos;
+  readonly monitores: Monitores;
+  readonly historico: HistoricoNotificacoes;
+  private readonly remetenteGrupos: Remetente;
+  private readonly emailDoAluno: (nome: string) => string | undefined;
 
-  constructor(
-    readonly grupos: Grupos = new Grupos(),
-    readonly monitores: Monitores = new Monitores(),
-    readonly historico: HistoricoNotificacoes = new HistoricoNotificacoes(),
+  constructor(opcoes: OpcoesServices = {}) {
+    const emTeste = process.env.NODE_ENV === 'test';
+    this.grupos = opcoes.grupos ?? new Grupos();
+    this.monitores = opcoes.monitores ?? new Monitores();
+    this.historico = opcoes.historico ?? new HistoricoNotificacoes();
+    this.emailDoAluno = opcoes.emailDoAluno ?? (() => undefined);
     // Nos testes automáticos o envio de grupos é sempre simulado; fora deles,
     // EmailSenderGrupos só envia de verdade com NOTIFICACOES_GRUPO_EMAIL=smtp.
-    emailSender: EmailSender | Pick<EmailSenderSmtp, 'send'> =
-      process.env.NODE_ENV === 'test' ? new EmailSenderSimulado() : new EmailSenderGrupos(),
-    gradeNotificationSender: EmailSender | Pick<EmailSenderSmtp, 'send'> =
-      process.env.NODE_ENV === 'test' ? emailSender : new EmailSenderSmtp(),
-    /** E-mail de um aluno pelo nome, vindo do cadastro de alunos (aba Students). */
-    private readonly emailDoAluno: (nome: string) => string | undefined = () => undefined
-  ) {
+    const emailSender = opcoes.emailSender ?? (emTeste ? new EmailSenderSimulado() : new EmailSenderGrupos());
+    const gradeNotificationSender = opcoes.gradeNotificationSender ?? (emTeste ? emailSender : new EmailSenderSmtp());
     this.remetenteGrupos = emailSender;
-    this.notificacaoService = new NotificacaoService(historico, emailSender);
+    this.notificacaoService = new NotificacaoService(this.historico, emailSender);
     this.gradeNotificationSender = gradeNotificationSender;
     this.gradeNotificationService = new GradeNotification(gradeNotificationSender);
   }
