@@ -20,6 +20,7 @@ module.exports = {
     paths: ['src/features/**/*.feature'],
     requireModule: ['ts-node/register']
   },
+  // A tag seleciona os cenários de configuração e carrega seus passos de Puppeteer.
   lembretesGui: {
     paths: ['../features/Notificacao_falta_cadastrar_alguma_nota.feature'],
     tags: '@lembretes-configuracao-gui',
