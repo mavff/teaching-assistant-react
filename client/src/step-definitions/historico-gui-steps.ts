@@ -11,7 +11,8 @@ import type { HistoricoNotificacoes } from '../../../server/src/models/Historico
 const nomesDosCenarios = new Set([
   'Visualização do histórico de notificações',
   'Visualização dos detalhes históricos de uma notificação',
-  'Visualização de uma falha no próprio histórico'
+  'Visualização de uma falha no próprio histórico',
+  'Filtragem do próprio histórico por disciplina e turma'
 ]);
 
 let pasta: string | undefined;
@@ -323,4 +324,58 @@ Then('os detalhes mostram a descrição da falha {string}', async (descricao: st
   await pagina.waitForFunction((alvo, esperado) =>
     document.querySelector(alvo)?.textContent?.trim() === esperado,
   {}, seletor, descricao);
+});
+
+const filtroDisciplina = '[data-cy="historico-filtro-disciplina"]';
+const filtroTurma = '[data-cy="historico-filtro-turma"]';
+
+async function conferirTurmasVisiveis(esperadas: string[]): Promise<void> {
+  await pagina.waitForFunction(turmas => {
+    const exibidas = Array.from(document.querySelectorAll('[data-cy="historico-turma"]'))
+      .map(celula => celula.textContent?.trim());
+
+    // Exige a lista completa esperada, na mesma ordem.
+    return exibidas.length === turmas.length &&
+      exibidas.every((turma, indice) => turma === turmas[indice]);
+  }, {}, esperadas);
+}
+
+Then(
+  'o histórico apresenta as turmas {string}, {string} e {string}, nessa ordem',
+  (primeira: string, segunda: string, terceira: string) =>
+    conferirTurmasVisiveis([primeira, segunda, terceira])
+);
+
+When(
+  'o professor filtra o histórico pela disciplina {string} e pela turma {string}',
+  async (disciplina: string, turma: string) => {
+    await pagina.waitForSelector(filtroDisciplina, { visible: true });
+    await pagina.select(filtroDisciplina, disciplina);
+
+    // Aguarda a atualização das opções de turma após selecionar a disciplina.
+    await pagina.waitForFunction((seletor, valor) =>
+      Array.from(document.querySelector<HTMLSelectElement>(seletor)?.options ?? [])
+        .some(opcao => opcao.value === valor),
+    {}, filtroTurma, turma);
+
+    await pagina.select(filtroTurma, turma);
+  }
+);
+
+Then(
+  'os filtros apresentados são a disciplina {string} e a turma {string}',
+  async (disciplina: string, turma: string) => {
+    await pagina.waitForFunction((disciplinaSeletor, turmaSeletor, disciplinaEsperada, turmaEsperada) =>
+      document.querySelector<HTMLSelectElement>(disciplinaSeletor)?.value === disciplinaEsperada &&
+      document.querySelector<HTMLSelectElement>(turmaSeletor)?.value === turmaEsperada,
+    {}, filtroDisciplina, filtroTurma, disciplina, turma);
+  }
+);
+
+Then('o histórico apresenta somente a turma {string}', (turma: string) =>
+  conferirTurmasVisiveis([turma]) // Confirma também que as outras duas saíram da lista.
+);
+
+When('o professor limpa os filtros do histórico', async () => {
+  await pagina.click('[data-cy="historico-limpar-filtros"]');
 });

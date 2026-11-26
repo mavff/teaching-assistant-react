@@ -45,21 +45,21 @@ Feature: Notificações de pendências no lançamento de notas
 
    
    @gui
-   # DDD (regra central representada): Services.filtrarHistorico coordena HistoricoNotificacoes.filtrar usando a identificação já existente em turmaRegistrada, com a disciplina e a turma selecionadas, preservando os demais registros.
+   # DDD (regra central representada): a aba filtra a listagem recebida usando a disciplina e a turma identificadas no rótulo histórico da tentativa.
+   # Validação: completa (Chrome/Cucumber, perfil historicoGui).
    Scenario: Filtragem do próprio histórico por disciplina e turma
-      Given o professor "Paulo Borba" está na tela "Histórico de notificações", sem filtros aplicados
-      And existe uma notificação de "Paulo Borba" para a turma "2026.2 de ESS", em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And existe uma notificação de "Paulo Borba" para a turma "2026.1 de ESS", em "20/02/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And existe uma notificação de "Paulo Borba" para a turma "2026.2 de Introdução a Programação", em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
-      When "Paulo Borba" filtra seu histórico pela disciplina "ESS" e turma "2026.2 de ESS"
-      Then "Paulo Borba" permanece na tela "Histórico de notificações"
-      And os filtros apresentados são a disciplina "ESS" e a turma "2026.2 de ESS"
-      And é apresentada a notificação de "Paulo Borba" da turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And a notificação da turma "2026.1 de ESS", registrada em "20/02/2026 às 09:00", não é apresentada
-      And a notificação da turma "2026.2 de Introdução a Programação", registrada em "27/08/2026 às 09:00", não é apresentada
+      Given existe uma notificação para a turma "2026.2 de ESS", em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
+      And existe uma notificação para a turma "2026.1 de ESS", em "20/02/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
+      And existe uma notificação para a turma "2026.2 de Introdução a Programação", em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
+      And o professor está na tela "Histórico de notificações"
+      And o histórico apresenta as turmas "2026.2 de Introdução a Programação", "2026.2 de ESS" e "2026.1 de ESS", nessa ordem
+      When o professor filtra o histórico pela disciplina "ESS" e pela turma "2026.2 de ESS"
+      Then os filtros apresentados são a disciplina "ESS" e a turma "2026.2 de ESS"
+      And o histórico apresenta somente a turma "2026.2 de ESS"
+      And é apresentada a notificação da turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
+      When o professor limpa os filtros do histórico
+      Then o histórico apresenta as turmas "2026.2 de Introdução a Programação", "2026.2 de ESS" e "2026.1 de ESS", nessa ordem
 
-  
-   
    @gui
    # DDD (regra central representada): a consulta pelo ID devolve descricaoFalha do registro da tentativa.
    # Validação: completa (Chrome/Cucumber, perfil historicoGui).

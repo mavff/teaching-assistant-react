@@ -108,7 +108,7 @@ prevista no respectivo cenário.
 | --- | --- | --- | --- |
 | [Visualização do histórico de notificações](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L22) | Turmas | Regra central representada | A rota `GET /api/notificacoes/historico` consulta diretamente `HistoricoNotificacoes.listar()` no histórico de lembretes. A tabela mostra os registros Enviado, Falha e Ignorado, com a turma e os dados registrados na época. Validado em Chrome/Cucumber (perfil historicoGui). |
 | [Visualização dos detalhes históricos de uma notificação](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L36) | Histórico de notificações | Regra central representada | `GET /api/notificacoes/historico/:id` consulta `HistoricoNotificacoes.buscar()` no histórico de lembretes. A linha expandida mostra o e-mail, o prazo e as pendências registrados na tentativa, inclusive depois que as notas são lançadas. Validado em Chrome/Cucumber (perfil historicoGui). |
-| [Filtragem do próprio histórico por disciplina e turma](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L49) | Histórico de notificações — sem filtros aplicados | Regra central representada | Services.filtrarHistorico coordena HistoricoNotificacoes.filtrar pelas relações existentes; turmaRegistrada já identifica disciplina e turma. A seleção combina os dois critérios, exclui ESS de outro semestre e outras disciplinas do resultado e preserva todos os registros. |
+| [Filtragem do próprio histórico por disciplina e turma](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L50) | Histórico de notificações — sem filtros aplicados | Regra central representada | A aba aplica filtros opcionais de disciplina e turma à listagem recebida, usando a turma gravada na tentativa. A seleção preserva a ordem da lista e limpar os filtros restaura todos os registros. Validado em Chrome/Cucumber (perfil historicoGui). |
 | [Visualização de uma falha no próprio histórico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L66) | Histórico de notificações | Regra central representada | `GET /api/notificacoes/historico/:id` devolve a descrição original gravada na tentativa. A linha expandida a exibe junto dos demais dados da tentativa com status Falha. Validado em Chrome/Cucumber (perfil historicoGui). |
 | [Configuração da quantidade, datas e horários dos lembretes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L79) | Turmas — turma 2026.2 de ESS disponível | Regra central representada | `atualizar` valida o conjunto final, a quantidade e os agendamentos antes de alterar a configuração. |
 | [Alteração de lembrete futuro sem afetar outra turma](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L104) | Configuração de lembretes — turma 2026.2 de ESS | Regra central representada | `reagendar` preserva identidade e demais lembretes; configurações ficam associadas às respectivas turmas. |
@@ -528,24 +528,16 @@ históricas e o prazo registrado nos detalhes são descritos a seguir.
 
 ## Percurso da filtragem do histórico
 
-- **Métodos aprovados:** Services.filtrarHistorico(disciplina, turma) coordena
-  HistoricoNotificacoes.filtrar(disciplina, turma). A associação entre as classes
-  e a composição com Notificacao já existem; não são acrescentadas relações.
-- **Dados existentes:** turmaRegistrada identifica a turma e sua disciplina,
-  como 2026.2 de ESS. Não se acrescenta disciplinaRegistrada nem outro atributo
-  em Notificacao. O filtro usa os dados históricos registrados.
-- **Resultado do cenário:** selecionando ESS e 2026.2 de ESS, retornar a notificação
-  de 25/08/2026 às 09:00, com motivo Notas pendentes e resultado Enviado. As
-  notificações de 2026.1 de ESS e 2026.2 de Introdução a Programação ficam fora
-  desse resultado, mas permanecem no histórico com todos os seus dados.
-- **Preservação:** a filtragem mantém identificadores, datas, motivos, resultados
-  e demais dados. A consulta não envia email nem executa reenvio.
-
-A regra central de filtragem passa de Pendente para representada. As classes do
-cliente, Email Service, Interface, Notificacao e todas as relações permanecem
-inalteradas. No incremento da filtragem, o nome e os passos do cenário Gherkin
-foram preservados. Depois, a autenticação foi retirada com aprovação do responsável:
-o cenário começa com o professor no Histórico de notificações, sem filtros aplicados.
+- **Fonte:** a aba recebe todos os registros pela rota
+  `GET /api/notificacoes/historico` e filtra a lista já carregada.
+- **Critérios:** o rótulo histórico `turmaRegistrada`, como 2026.2 de ESS,
+  identifica a disciplina ESS e a turma completa. A disciplina escolhida limita
+  as opções de turma.
+- **Resultado do cenário:** a aba abre com todos os registros. Ao selecionar ESS e
+  2026.2 de ESS, só o registro dessa turma fica visível, com os mesmos dados e na
+  mesma ordem de origem. Limpar os filtros restaura a lista completa.
+- **Preservação:** os filtros operam na tela e mantêm os registros gravados
+  pelo agendador.
 
 ## Percurso das pendências históricas nos detalhes
 

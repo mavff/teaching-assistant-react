@@ -32,7 +32,8 @@ module.exports = {
     name: [
       '^Visualização do histórico de notificações$',
       '^Visualização dos detalhes históricos de uma notificação$',
-      '^Visualização de uma falha no próprio histórico$'
+      '^Visualização de uma falha no próprio histórico$',
+      '^Filtragem do próprio histórico por disciplina e turma$'
     ],
     requireModule: ['ts-node/register/transpile-only'],
     require: ['src/step-definitions/historico-gui-steps.ts'],
