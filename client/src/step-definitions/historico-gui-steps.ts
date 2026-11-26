@@ -25,7 +25,7 @@ let origemDaApi: string;
 let idSelecionado: number | undefined;
 
 /** Abre o Chrome e uma API isolada que recebe os dados de cada cenário. */
-Before({ timeout: 30_000 }, async ({ pickle }) => {
+Before({ timeout: 30_000 }, async function ({ pickle }) {
   if (!nomesDosCenarios.has(pickle.name)) return;
 
   const pastaDeTeste = mkdtempSync(join(tmpdir(), 'ta-historico-gui-'));
@@ -64,7 +64,7 @@ Before({ timeout: 30_000 }, async ({ pickle }) => {
   origemDaApi = `http://127.0.0.1:${endereco.port}`;
   navegador = await launch({
     executablePath: process.env.CHROME_BIN,
-    headless: true,
+    headless: this.parameters.janela !== true, // A opção do Cucumber abre a janela só na demonstração.
     args: ['--no-sandbox', '--disable-dev-shm-usage']
   });
   pagina = await navegador.newPage();

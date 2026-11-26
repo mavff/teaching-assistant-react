@@ -25,7 +25,10 @@ module.exports = {
     paths: ['../features/Notificacao_falta_cadastrar_alguma_nota.feature'],
     tags: '@lembretes-configuracao-gui',
     requireModule: ['ts-node/register/transpile-only'],
-    require: ['src/step-definitions/lembretes-gui-steps.ts'],
+    require: [
+      'src/step-definitions/lembretes-gui-steps.ts',
+      'src/test-support/demonstracao-gui.ts'
+    ],
     format: ['progress-bar']
   },
   // Seleciona os quatro cenários de histórico pelo título e carrega os passos correspondentes.
@@ -38,7 +41,10 @@ module.exports = {
       '^Filtragem do próprio histórico por disciplina e turma$'
     ],
     requireModule: ['ts-node/register/transpile-only'],
-    require: ['src/step-definitions/historico-gui-steps.ts'],
+    require: [
+      'src/step-definitions/historico-gui-steps.ts',
+      'src/test-support/demonstracao-gui.ts'
+    ],
     format: ['progress-bar']
   }
 };
