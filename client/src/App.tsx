@@ -237,7 +237,7 @@ const App: React.FC = () => {
             </>
           )}
 
-          {activeTab === 'notification-history' && <NotificationHistory />}
+          {activeTab === 'notification-history' && <NotificationHistory />}{/* A aba monta o histórico ao abrir e o desmonta ao sair. */}
           {activeTab === 'groups' && <Grupos />}
         </div>
       </main>
