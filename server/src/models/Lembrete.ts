@@ -20,6 +20,7 @@ export class Lembrete {
   private motivo: string | null;
   private proximoReenvioEm: Date | null;
 
+  /** Reconstrói o lembrete a partir de seus dados e valida ID, agendamento, estado e reenvio. */
   constructor(registro: RegistroLembrete) {
     if (typeof registro.id !== 'string' || !registro.id.trim()) {
       throw new Error('Identificador do lembrete inválido');
@@ -41,8 +42,9 @@ export class Lembrete {
     this.proximoReenvioEm = registro.proximoReenvioEm == null ? null : new Date(registro.proximoReenvioEm.getTime());
   }
 
+  /** Valida o agendamento contra o relógio e o prazo e cria o lembrete com o estado inicial. */
   static criar(proposta: LembreteProposto, instanteAtual: Date, prazoAcademico: Date): Lembrete {
-    Lembrete.validarAgendamento(proposta.data, proposta.horario, instanteAtual, prazoAcademico); // Valida antes de criar um novo lembrete de configuração.
+    Lembrete.validarAgendamento(proposta.data, proposta.horario, instanteAtual, prazoAcademico);
     return new Lembrete({ id: proposta.id, data: proposta.data, horario: proposta.horario }); // Copia somente os dados de configuração; um novo lembrete sempre começa como Não enviado.
   }
 
@@ -51,8 +53,10 @@ export class Lembrete {
   getHorario(): string { return this.horario; }
   getEstado(): EstadoLembrete { return this.estado; }
   getMotivo(): string | null { return this.motivo; }
+  /** Identifica um envio concluído para o serviço pular novo processamento. */
   jaFoiEnviado(): boolean { return this.estado === 'Enviado'; }
 
+  /** Registra o sucesso de um lembrete pendente e encerra o reenvio. Repetir o sucesso é seguro. */
   marcarComoEnviado(): void {
     if (this.jaFoiEnviado()) return;
 
@@ -64,6 +68,7 @@ export class Lembrete {
     this.proximoReenvioEm = null; // A aceitação do envio encerra o reenvio programado.
   }
 
+  /** Encerra somente um lembrete que ainda aguarda o primeiro envio e registra o motivo. */
   ignorar(motivo: string): void {
     if ((this.estado !== 'Não enviado' && this.estado !== 'Agendado') ||
       this.proximoReenvioEm !== null) {
@@ -75,6 +80,7 @@ export class Lembrete {
     this.motivo = motivo;
   }
 
+  /** Guarda o instante da próxima tentativa, calculado pelo serviço, para um lembrete pendente. */
   programarReenvio(dataHora: Date): void {
     if (this.estado !== 'Não enviado' && this.estado !== 'Agendado') {
       throw new Error('Somente lembretes aguardando envio podem ser reprogramados');
@@ -83,6 +89,7 @@ export class Lembrete {
     this.proximoReenvioEm = new Date(dataHora.getTime()); // Conserva o agendamento original.
   }
 
+  /** Cancela um lembrete que aguarda reenvio, registra o motivo e limpa a próxima tentativa. */
   cancelar(motivo: string): void {
     if (this.proximoReenvioEm === null || (this.estado !== 'Não enviado' && this.estado !== 'Agendado')) {
       throw new Error('O lembrete não aguarda reenvio');
@@ -96,10 +103,12 @@ export class Lembrete {
     return Lembrete.obterInstante(this.data, this.horario); // Retorna um novo Date para impedir alterações externas no agendamento.
   }
 
+  /** Devolve uma cópia do instante para impedir alterações externas na programação. */
   getProximoReenvioEm(): Date | null {
     return this.proximoReenvioEm === null ? null : new Date(this.proximoReenvioEm.getTime());
   }
 
+  /** Valida a nova data e hora antes de alterar o agendamento de um lembrete editável. */
   reagendar(novaData: string, novoHorario: string, instanteAtual: Date, prazoAcademico: Date): void {
     if (this.jaFoiEnviado()) throw new Error('Lembretes enviados não podem ser alterados');
     if (this.estado === 'Ignorado' || this.estado === 'Cancelado') {
@@ -122,6 +131,7 @@ export class Lembrete {
     });
   }
 
+  /** Prepara o registro para persistência e converte o instante de reenvio em texto ISO. */
   toJSON() {
     return {
       id: this.id,
@@ -129,10 +139,11 @@ export class Lembrete {
       horario: this.horario, // Mantém o horário UTC com precisão de minutos.
       estado: this.estado,
       motivo: this.motivo,
-      proximoReenvioEm: this.proximoReenvioEm?.toISOString() ?? null // Converte Date para texto ISO no JSON.
+      proximoReenvioEm: this.proximoReenvioEm?.toISOString() ?? null
     };
   }
 
+  /** Valida os campos persistidos e recupera o estado e o reenvio de um registro existente. */
   static fromJSON(dados: unknown): Lembrete {
     if (typeof dados !== 'object' || dados === null) {
       throw new Error('Registro de lembrete persistido inválido');
@@ -159,6 +170,7 @@ export class Lembrete {
     }); // Reconstrói dados históricos sem exigir que o agendamento esteja no futuro.
   }
 
+  /** Interpreta data e hora como UTC e rejeita valores que o Date normalizaria. */
   private static obterInstante(data: string, horario: string): Date {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}$/.test(horario)) {
       throw new Error('Data ou horário do lembrete inválido');
@@ -166,11 +178,12 @@ export class Lembrete {
     const iso = `${data}T${horario}:00.000Z`;
     const instante = new Date(iso);
     if (!Number.isFinite(instante.getTime()) || instante.toISOString() !== iso) {
-      throw new Error('Data ou horário do lembrete inválido'); // A comparação também rejeita datas que Date normalizaria, como 30 de fevereiro.
+      throw new Error('Data ou horário do lembrete inválido');
     }
     return instante;
   }
 
+  /** Exige um agendamento a partir do instante atual e até o prazo acadêmico, inclusive. */
   private static validarAgendamento(data: string, horario: string, instanteAtual: Date, prazoAcademico: Date): void {
     if (!Number.isFinite(instanteAtual.getTime())) throw new Error('Instante atual inválido');
     if (!Number.isFinite(prazoAcademico.getTime())) throw new Error('Prazo acadêmico inválido');

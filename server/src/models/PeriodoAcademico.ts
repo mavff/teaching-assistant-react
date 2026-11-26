@@ -7,13 +7,14 @@ export class PeriodoAcademico {
   private readonly semestre: number;
   private prazoAcademico: Date | null;
 
+  /** Valida o ano, o semestre e o prazo opcional, que pode vir de um registro histórico. */
   constructor(ano: number, semestre: number, prazoAcademico: Date | null = null) {
     if (!Number.isSafeInteger(ano) || ano < 1) throw new Error('Ano acadêmico inválido');
     if (semestre !== 1 && semestre !== 2) throw new Error('Semestre acadêmico inválido');
     if (prazoAcademico !== null && !Number.isFinite(prazoAcademico.getTime())) throw new Error('Prazo acadêmico inválido');
     this.ano = ano;
     this.semestre = semestre;
-    this.prazoAcademico = prazoAcademico === null ? null : new Date(prazoAcademico.getTime()); // A reconstrução de um registro histórico pode conter um prazo passado.
+    this.prazoAcademico = prazoAcademico === null ? null : new Date(prazoAcademico.getTime());
   }
 
   getAno(): number { return this.ano; }
@@ -24,12 +25,14 @@ export class PeriodoAcademico {
     return this.prazoAcademico === null ? null : new Date(this.prazoAcademico.getTime()); // A cópia impede que um consumidor altere a fonte compartilhada sem validação.
   }
 
+  /** Exige prazo definido e considera encerrado somente um instante posterior ao prazo. */
   prazoEncerrado(instanteAtual: Date): boolean {
     if (this.prazoAcademico === null) throw new Error('Prazo acadêmico não definido para o período');
     if (!Number.isFinite(instanteAtual.getTime())) throw new Error('Instante atual inválido');
-    return instanteAtual.getTime() > this.prazoAcademico.getTime(); // Exatamente no prazo ainda não está encerrado, conforme o DDD.
+    return instanteAtual.getTime() > this.prazoAcademico.getTime();
   }
 
+  /** Aceita um novo prazo a partir do instante atual e verifica se há lembretes pendentes após ele. */
   definirPrazoAcademico(
     novoPrazo: Date,
     instanteAtual: Date,
