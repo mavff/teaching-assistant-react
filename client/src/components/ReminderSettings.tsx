@@ -186,12 +186,12 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
   const showSavedOnly = (saved?.lembretes.length ?? 0) > 0 && !isEditing;
 
   return (
-    <section aria-labelledby="reminder-settings-title">
-      <h2 id="reminder-settings-title">Configuração de lembretes</h2>
-      <p>Turma: <strong>{classInfo.year}.{classInfo.semester} de {classInfo.topic}</strong></p>
+    <section aria-labelledby="reminder-settings-title" data-cy="config-lembretes-pagina">
+      <h2 id="reminder-settings-title" data-cy="config-lembretes-titulo">Configuração de lembretes</h2>
+      <p>Turma: <strong data-cy="config-lembretes-turma">{classInfo.year}.{classInfo.semester} de {classInfo.topic}</strong></p>
       {isLoading && <p role="status">Carregando lembretes…</p>}
       {saved && (
-        <p>Prazo acadêmico da turma: <strong>
+        <p>Prazo acadêmico da turma: <strong data-cy="prazo-academico">
           {saved.prazoAcademico ? formatInstant(saved.prazoAcademico) : 'Não definido'}
         </strong></p>
       )}
@@ -208,7 +208,7 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
             ) : (
               <div className="form-group">
                 <label htmlFor="reminder-count">Quantidade de lembretes</label>
-                <input id="reminder-count" type="number" min={0} step={1} value={reminderCount}
+                <input id="reminder-count" data-cy="quantidade-lembretes" type="number" min={0} step={1} value={reminderCount}
                   onChange={event => handleCountChange(event.target.value)} />
               </div>
             )}
@@ -220,11 +220,11 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
               const editable = canEditReminder(draft);
 
               return (
-                <div key={draft.id} role="group" aria-labelledby={labelId}
+                <div key={draft.id} role="group" aria-labelledby={labelId} data-cy="lembrete-linha"
                   className={isEditing ? 'form-group reminder-edit-row' : 'form-group'}>
                   <div className="reminder-date-field">
                     <label id={labelId} htmlFor={fieldId}>Data e horário do lembrete {index + 1}</label>
-                    <input id={fieldId} type="datetime-local" value={draft.dateTime}
+                    <input id={fieldId} data-cy="lembrete-data" type="datetime-local" value={draft.dateTime}
                       disabled={!editable || isRemoved}
                       onChange={event => handleDateChange(draft.id, event.target.value)} />
                   </div>
@@ -239,11 +239,11 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
                           </button>
                         </>
                       ) : editable ? (
-                        <button type="button" aria-describedby={labelId} onClick={() => removeReminder(draft)}>
+                        <button type="button" aria-describedby={labelId} data-cy="lembrete-remover" onClick={() => removeReminder(draft)}>
                           Remover
                         </button>
                       ) : (
-                        <span>{draft.estado}</span>
+                        <span data-cy="lembrete-estado">{draft.estado}</span>
                       )}
                     </div>
                   )}
@@ -252,10 +252,10 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
             })}
 
             {isEditing && (
-              <button type="button" onClick={addReminder}>Adicionar lembrete</button>
+              <button type="button" data-cy="adicionar-lembrete" onClick={addReminder}>Adicionar lembrete</button>
             )}
             <div className="form-buttons">
-              <button type="submit">{isSaving ? 'Salvando…' : 'Salvar configuração'}</button>
+              <button type="submit" data-cy="salvar-configuracao">{isSaving ? 'Salvando…' : 'Salvar configuração'}</button>
               {isEditing && (
                 <button type="button" onClick={cancelEdit}>Cancelar edição</button>
               )}
@@ -264,19 +264,19 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
         </form>
       )}
 
-      {saveError && <p role="alert">{saveError}</p>}
-      {saveSuccess && <p role="status">{saveSuccess}</p>}
+      {saveError && <p role="alert" data-cy="mensagem-erro">{saveError}</p>}
+      {saveSuccess && <p role="status" data-cy="mensagem-sucesso">{saveSuccess}</p>}
       {saved && (
         <section aria-labelledby="saved-reminders-title" className={showSavedOnly ? 'reminder-saved-card' : undefined}>
           <h3 id="saved-reminders-title">Configuração salva</h3>
-          <p>Quantidade de lembretes: {saved.lembretes.length}</p>
+          <p data-cy="lembretes-salvos-quantidade">Quantidade de lembretes: {saved.lembretes.length}</p>
           <ol>
             {saved.lembretes.map(lembrete => (
-              <li key={lembrete.id}>{formatInstant(`${lembrete.data}T${lembrete.horario}:00.000Z`)}</li>
+              <li key={lembrete.id} data-cy="lembrete-salvo">{formatInstant(`${lembrete.data}T${lembrete.horario}:00.000Z`)}</li>
             ))}
           </ol>
           {showSavedOnly && (
-            <button type="button" disabled={!saved.prazoAcademico} onClick={() => {
+            <button type="button" data-cy="editar-lembretes" disabled={!saved.prazoAcademico} onClick={() => {
               clearFeedback();
               setIsEditing(true); // Abre o formulário preenchido com a configuração salva.
             }}>

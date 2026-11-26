@@ -280,8 +280,8 @@ const Classes: React.FC<ClassesProps> = ({
   }
 
   return (
-    <div className="classes-container">
-      <h2>Class Management</h2>
+    <div className="classes-container" data-cy="turmas-pagina">
+      <h2 data-cy="turmas-titulo">Class Management</h2>
 
       <section
         className={`class-form-container${showSavedClassesEmail ? ' classes-email-configured' : ''}`}
@@ -428,7 +428,7 @@ const Classes: React.FC<ClassesProps> = ({
               </thead>
               <tbody>
                 {classes.map((classObj) => (
-                  <tr key={getClassId(classObj)}>
+                  <tr key={getClassId(classObj)} data-cy={`turma-${getClassId(classObj)}`}>
                     <td><strong>{classObj.topic}</strong></td>
                     <td><strong>{classObj.year}</strong></td>
                     <td><strong>{classObj.semester === 1 ? '1st Semester' : '2nd Semester'}</strong></td>
@@ -457,6 +457,7 @@ const Classes: React.FC<ClassesProps> = ({
                       </button>
                       <button
                         type="button"
+                        data-cy="configurar-lembretes"
                         onClick={() => setReminderClass(classObj)}
                       >{/* type="button" evita enviar formulários; onClick guarda a turma desta linha para abrir sua configuração. */}
                         Configurar lembretes
