@@ -1,3 +1,5 @@
+import { EVALUATION_GOALS } from './Evaluation';
+
 export type Grade = 'MANA' | 'MPA' | 'MA';
 type Meta = string;
 
@@ -85,11 +87,8 @@ const DEFAULT_PESOS_DOS_CONCEITOS = new Map<Grade, number>([
   ['MANA', 0],
 ]);
 
-const DEFAULT_PESOS_DAS_METAS = new Map<Meta, number>([
-  ['Gerência de Configuração', 1],
-  ['Gerência de Projeto', 1],
-  ['Qualidade de Software', 1],
-]);
+// Every evaluation goal graded in a class has the same weight by default
+const DEFAULT_PESOS_DAS_METAS = new Map<Meta, number>(EVALUATION_GOALS.map(meta => [meta, 1]));
 
 export const DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA = new EspecificacaoDoCalculoDaMedia(
   DEFAULT_PESOS_DOS_CONCEITOS,

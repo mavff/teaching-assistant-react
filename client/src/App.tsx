@@ -9,10 +9,11 @@ import Evaluations from './components/Evaluations';
 import Classes from './components/Classes';
 import Grupos from './components/Grupos';
 import NotificationHistory from './components/NotificationHistory';
+import StudentNotifications from './components/StudentNotifications';
 import AcademicPeriodSettings from './components/AcademicPeriodSettings';
 import './App.css';
 
-type TabType = 'students' | 'evaluations' | 'classes' | 'groups' | 'notification-history';
+type TabType = 'students' | 'evaluations' | 'classes' | 'groups' | 'notification-history' | 'student-notifications';
 
 const App: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -164,6 +165,13 @@ const App: React.FC = () => {
           >
             Groups
           </button>
+          <button
+            className={`tab-button ${activeTab === 'student-notifications' ? 'active' : ''}`}
+            onClick={() => setActiveTab('student-notifications')}
+            data-testid="student-notifications-tab"
+          >
+            Notifications
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -239,6 +247,7 @@ const App: React.FC = () => {
 
           {activeTab === 'notification-history' && <NotificationHistory />}
           {activeTab === 'groups' && <Grupos />}
+          {activeTab === 'student-notifications' && <StudentNotifications onError={handleError} />}
         </div>
       </main>
     </div>

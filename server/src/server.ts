@@ -11,6 +11,8 @@ import { PeriodoAcademico } from './models/PeriodoAcademico';
 import { ConfiguracaoLembretes } from './models/ConfiguracaoLembretes';
 import { LembreteProposto } from './models/Lembrete';
 import { Services } from './models/Services';
+import { QuartileNotificationCenter } from './models/QuartileNotificationCenter';
+import { QuartileNotifier } from './models/QuartileNotifier';
 import { grupoRoutes } from './routes/grupos';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -33,6 +35,7 @@ app.use(express.json());
 const studentSet = new StudentSet();
 const classes = new Classes();
 const historicoLembretes = new HistoricoNotificacoes(); // Histórico das turmas, separado do fluxo de grupos.
+const quartileNotifications = new QuartileNotificationCenter(); // Notificações de quartil de desempenho dos alunos.
 const periodosAcademicos = new Map<string, PeriodoAcademico>(); // Mantém um período por identificação, como 2026.2, mesmo sem turmas cadastradas.
 const dataFile = path.resolve('./data/app-data.json');
 
@@ -60,6 +63,7 @@ const saveDataToFile = (
   try {
     const data = {
       historicoLembretes: historicoLembretes.toJSON(),
+      notificacoesDeQuartil: quartileNotifications.toJSON(),
       emailDasTurmas: classes.obterEmailDasTurmas(), // Grava um único endereço no mesmo JSON das turmas e dos alunos.
       periodosAcademicos: Array.from(periodosParaSalvar.values()).map(periodo => ({
         ano: periodo.getAno(),
@@ -205,6 +209,11 @@ const loadDataFromFile = (): void => {
           }
         });
       }
+
+      // Quartile notifications and the last quartile told to each student. Quartiles not
+      // recorded yet are recorded silently, so that loading data never creates notifications.
+      quartileNotifications.restore(data.notificacoesDeQuartil);
+      classes.getAllClasses().forEach(classObj => quartileNotifications.recordCurrentQuartiles(classObj));
     }
   } catch (error) {
     console.error('Error loading data from file:', error);
@@ -457,6 +466,7 @@ app.delete('/api/students/:cpf', (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Student not found' });
     }
     
+    quartileNotifications.removeStudent(cleanedCPF); // a reused CPF must not inherit the notifications
     triggerSave(); // Save to file after deleting
     res.status(204).send();
   } catch (error) {
@@ -596,6 +606,7 @@ app.put('/api/classes/:id', (req: Request, res: Response) => {
     existingClass.definirPeriodoAcademico(periodo); // Altera ano e semestre juntos, após conferir a compatibilidade dos lembretes existentes.
     existingClass.setTopic(topic);
     periodosAcademicos.set(periodo.getIdentificador(), periodo); // Registra um período novo somente após aceitar a troca.
+    quartileNotifications.renameClass(id, existingClass.getClassId()); // the class keeps its notifications under the new id
     
     triggerSave(); // Save to file after updating class
     res.json(existingClass.toJSON());
@@ -614,6 +625,7 @@ app.delete('/api/classes/:id', (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Class not found' });
     }
     
+    quartileNotifications.removeClass(id);
     triggerSave(); // Save to file after deleting class
     res.status(204).send();
   } catch (error) {
@@ -666,6 +678,7 @@ app.delete('/api/classes/:classId/enroll/:studentCPF', (req: Request, res: Respo
       return res.status(404).json({ error: 'Student not enrolled in this class' });
     }
     
+    quartileNotifier.send(quartileNotifications.refreshClass(classObj)); // the class distribution changed
     triggerSave(); // Save to file after unenrolling student
     res.status(204).send();
   } catch (error) {
@@ -751,6 +764,9 @@ app.put('/api/classes/:classId/enrollments/:studentCPF/evaluation', async (req: 
       enrollment.addOrUpdateEvaluation(goal, grade);
     }
 
+    // Recalculates the quartiles of the class; the students notified are also told by e-mail
+    quartileNotifier.send(quartileNotifications.refreshClass(classObj));
+
     const emailResult = await services.gradeNotificationService.notify(
       enrollment.getStudent(),
       goal,
@@ -763,6 +779,29 @@ app.put('/api/classes/:classId/enrollments/:studentCPF/evaluation', async (req: 
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
+});
+
+// GET /api/students/:cpf/notifications - Quartile notifications of one student only, newest first
+app.get('/api/students/:cpf/notifications', (req: Request, res: Response) => {
+  const cpf = cleanCPF(req.params.cpf);
+  if (!studentSet.findStudentByCPF(cpf)) {
+    return res.status(404).json({ error: 'Student not found' });
+  }
+  res.json(quartileNotifications.getNotificationsOf(cpf).map(n => n.toJSON()));
+});
+
+// PUT /api/students/:cpf/notifications/:id/read - Mark one of the student's own notifications as read
+app.put('/api/students/:cpf/notifications/:id/read', (req: Request, res: Response) => {
+  const cpf = cleanCPF(req.params.cpf);
+  if (!studentSet.findStudentByCPF(cpf)) {
+    return res.status(404).json({ error: 'Student not found' });
+  }
+  const notification = quartileNotifications.markAsRead(cpf, Number(req.params.id));
+  if (!notification) {
+    return res.status(404).json({ error: 'Notification not found' });
+  }
+  triggerSave();
+  res.json(notification.toJSON());
 });
 
 // POST api/classes/gradeImport/:classId, usado na feature de importacao de grades
@@ -798,8 +837,19 @@ const services = new Services({
 });
 app.use('/api', grupoRoutes(services));
 
+// Quartile notifications are e-mailed to the student with the sender already used for the grade-update e-mails
+const quartileNotifier = new QuartileNotifier(
+  services.gradeNotificationSender,
+  cpf => {
+    const student = studentSet.findStudentByCPF(cpf);
+    return student ? { name: student.name, email: student.email } : undefined;
+  },
+  classId => classes.findClassById(classId)?.getTopic() ?? classId,
+  triggerSave // the result of each e-mail is part of the saved notification
+);
+
 // Export the app for testing
-export { app, studentSet, classes, periodosAcademicos, services, historicoLembretes, saveDataToFile };
+export { app, studentSet, classes, periodosAcademicos, services, historicoLembretes, saveDataToFile, quartileNotifications, quartileNotifier };
 
 // Only start the server if this file is run directly (not imported for testing)
 if (require.main === module) {
