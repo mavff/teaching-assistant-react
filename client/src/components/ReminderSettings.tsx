@@ -14,15 +14,18 @@ interface ReminderDraft {
   estado: Lembrete['estado'];
 }
 
+/** Cria uma linha vazia com um ID próprio para a configuração em edição. */
 const createDraft = (): ReminderDraft => ({
   id: crypto.randomUUID(),
   dateTime: '',
   estado: 'Não enviado'
 });
 
+/** Libera a edição da data apenas para os estados que ainda aguardam envio. */
 const canEditReminder = (draft: ReminderDraft): boolean =>
   draft.estado === 'Não enviado' || draft.estado === 'Agendado';
 
+/** Converte o agendamento UTC da API para o campo local e preserva ID e estado. */
 const toDraft = (lembrete: Lembrete): ReminderDraft => {
   const instante = new Date(`${lembrete.data}T${lembrete.horario}:00.000Z`);
   const local = instante.getTime() - instante.getTimezoneOffset() * 60_000;
@@ -30,9 +33,10 @@ const toDraft = (lembrete: Lembrete): ReminderDraft => {
     id: lembrete.id,
     dateTime: new Date(local).toISOString().slice(0, 16),
     estado: lembrete.estado
-  }; // Converte UTC para apresentação local sem alterar o instante agendado.
+  };
 };
 
+/** Mostra o prazo ou o agendamento no fuso do navegador. */
 const formatInstant = (value: string): string => {
   const date = new Date(value);
   const day = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -62,6 +66,7 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
     setSaveError('');
     setSaveSuccess('');
 
+    /** Carrega o prazo oficial e os lembretes confirmados da turma aberta. */
     const load = async () => {
       try {
         const configuration = await ReminderService.getConfiguration(classInfo.id);
@@ -85,10 +90,10 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
     setSaveSuccess('');
   };
 
+  /** Descarta as alterações e recupera a última configuração confirmada. */
   const cancelEdit = () => {
     if (!saved) return;
 
-    // Descarta o rascunho e recupera os valores da última configuração confirmada.
     setReminderCount(String(saved.lembretes.length));
     setDrafts(saved.lembretes.map(toDraft));
     setRemovedReminderIds([]);
@@ -96,6 +101,7 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
     setIsEditing(false);
   };
 
+  /** Ajusta a quantidade de campos no cadastro inicial e conserva as datas se a quantidade voltar a aumentar. */
   const handleCountChange = (value: string) => {
     setReminderCount(value);
     clearFeedback();
@@ -104,19 +110,20 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
     setDrafts(previous => Array.from(
       { length: Math.max(quantity, previous.length) },
       (_, index) => previous[index] ?? createDraft()
-    )); // No primeiro cadastro, conserva os valores digitados se a quantidade voltar a aumentar.
+    ));
   };
 
+  /** Acrescenta uma linha com novo ID sem alterar os lembretes que já estavam no formulário. */
   const addReminder = () => {
     clearFeedback();
     const draft = createDraft();
     setDrafts(previous => [...previous, draft]);
   };
 
+  /** Marca um lembrete salvo para remoção e retira diretamente do rascunho os que ainda são novos. */
   const removeReminder = (draft: ReminderDraft) => {
     clearFeedback();
 
-    // A configuração confirmada identifica os lembretes que precisam aguardar o salvamento.
     if (saved?.lembretes.some(lembrete => lembrete.id === draft.id)) {
       setRemovedReminderIds(previous => [...previous, draft.id]);
       return;
@@ -125,6 +132,7 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
     setDrafts(previous => previous.filter(item => item.id !== draft.id));
   };
 
+  /** Retira a marca de remoção antes de enviar a configuração. */
   const undoReminderRemoval = (id: string) => {
     clearFeedback();
     setRemovedReminderIds(previous => previous.filter(removedId => removedId !== id));
@@ -144,6 +152,7 @@ const ReminderSettings: React.FC<ReminderSettingsProps> = ({ classInfo, onBack }
     ? displayedDrafts.filter(draft => !removedReminderIds.includes(draft.id))
     : displayedDrafts;
 
+  /** Envia os agendamentos ativos em UTC e atualiza o resumo com os dados que a API confirmou. */
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     if (isLoading || isSaving || !saved?.prazoAcademico) return;

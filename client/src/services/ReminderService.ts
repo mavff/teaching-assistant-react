@@ -3,10 +3,11 @@ import { ConfiguracaoLembretes, SalvarConfiguracaoLembretes } from '../types/Rem
 const API_BASE_URL = 'http://localhost:3005';
 
 class ReminderService {
+  /** Consulta o prazo oficial e os lembretes usando o identificador da turma. */
   static async getConfiguration(classId: string): Promise<ConfiguracaoLembretes> {
     const response = await fetch(
       `${API_BASE_URL}/api/classes/${encodeURIComponent(classId)}/lembretes`
-    ); // Consulta o prazo e os lembretes da mesma turma; a URL preserva os caracteres do identificador.
+    ); // Codifica o identificador para usá-lo como um segmento da URL.
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.error || 'Não foi possível consultar os lembretes');
@@ -14,6 +15,7 @@ class ReminderService {
     return data;
   }
 
+  /** Envia a proposta completa e devolve a configuração confirmada pelo servidor. */
   static async saveConfiguration(
     classId: string,
     configuration: SalvarConfiguracaoLembretes
@@ -30,7 +32,7 @@ class ReminderService {
     if (!response.ok) {
       throw new Error(data.error || 'Não foi possível salvar os lembretes');
     }
-    return data; // Somente a resposta confirmada pelo servidor atualiza o resumo da tela.
+    return data;
   }
 }
 

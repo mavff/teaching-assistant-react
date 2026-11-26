@@ -15,10 +15,11 @@ describe('API de períodos acadêmicos', () => {
   const prazoOriginal = '2099-08-31T23:59:00.000Z'; // Datas futuras de exemplo para estes testes; não definem o prazo da aplicação.
   const prazoNovo = '2099-08-28T23:59:00.000Z';
 
+  /** Limpa o estado compartilhado para que cada teste configure o próprio período e suas turmas. */
   beforeEach(() => {
     classes.definirEmailDasTurmas('contato@example.com'); // Prepara uma aplicação com o pré-requisito de cadastro atendido.
-    periodosAcademicos.clear(); // Cada teste começa sem os períodos criados pelos anteriores.
-    classes.getAllClasses().forEach(turma => classes.removeClass(turma.getClassId())); // Isola as configurações consultadas pela rota.
+    periodosAcademicos.clear();
+    classes.getAllClasses().forEach(turma => classes.removeClass(turma.getClassId()));
   });
 
   test('informa a ausência de um período sem cadastrá-lo durante a consulta', async () => { // Consultar não deve presumir prazo nem criar dados.

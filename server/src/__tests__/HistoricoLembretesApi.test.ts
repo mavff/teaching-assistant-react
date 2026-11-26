@@ -5,6 +5,7 @@ import { Notificacao } from '../models/Notificacao';
 describe('API do histórico de notificações', () => {
   const rota = '/api/notificacoes/historico';
 
+  /** Limpa os históricos de lembretes e de grupos para isolar a origem dos registros de cada teste. */
   afterEach(() => {
     historicoLembretes.limpar();
     services.historico.limpar();

@@ -23,11 +23,13 @@ describe('GUI de configuração de lembretes', () => {
     prazoAcademico: new Date('2099-08-31T23:59').toISOString(),
     lembretes: []
   };
+  /** Simula as partes da resposta HTTP que o cliente da API usa para ler sucesso e erro. */
   const response = (status: number, body: unknown): Response => ({
     ok: status >= 200 && status < 300, status, json: async () => body
   } as Response);
   const open = () => render(<ReminderSettings classInfo={turma} onBack={() => {}} />);
 
+  /** Monta um lembrete no formato UTC que o servidor devolve ao formulário. */
   const storedReminder = (
     id: string, dateTime: string, estado: Lembrete['estado'] = 'Não enviado'
   ): Lembrete => {
@@ -35,6 +37,7 @@ describe('GUI de configuração de lembretes', () => {
     return { id, data: iso.slice(0, 10), horario: iso.slice(11, 16), estado, motivo: null, proximoReenvioEm: null };
   };
 
+  /** Restringe a consulta ao grupo acessível da posição informada. */
   const reminderRow = (position: number) =>
     within(screen.getByRole('group', { name: `Data e horário do lembrete ${position}` }));
 

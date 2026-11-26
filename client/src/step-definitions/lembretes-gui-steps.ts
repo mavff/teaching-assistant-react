@@ -28,6 +28,7 @@ type TurmaDoCenario = {
 const turmasDoCenario = new Map<string, TurmaDoCenario>();
 
 const tags = '@lembretes-configuracao-gui';
+// Usa o mesmo fuso no relógio do teste e no navegador para comparar os horários da tela.
 const fuso = 'America/Sao_Paulo';
 function dataCy(nome: string): string {
   // Mantém válido o seletor se o ID da turma contiver aspas ou barras invertidas.
@@ -37,6 +38,7 @@ function dataCy(nome: string): string {
   return `[data-cy="${valor}"]`;
 }
 
+// Centraliza os atributos que localizam os elementos. O texto da tela é conferido nos Then.
 const SELETORES = {
   abaClasses: '[data-testid="classes-tab"]',
   turmasPagina: dataCy('turmas-pagina'),
@@ -61,6 +63,7 @@ const SELETORES = {
   editarLembretes: dataCy('editar-lembretes')
 };
 
+/** Restringe a busca ao formulário de configuração de lembretes. */
 function naConfiguracao(seletor: string): string {
   return `${SELETORES.configuracaoPagina} ${seletor}`;
 }
@@ -79,6 +82,7 @@ function dataParaCampo(data: string): string {
   return `${ano}-${mes}-${dia}T${horario}`;
 }
 
+/** Usa a API isolada para preparar ou consultar dados e exige o status esperado. */
 async function requisitar(
   metodo: string,
   rota: string,
@@ -94,12 +98,14 @@ async function requisitar(
   return resposta;
 }
 
+/** Espera o botão ficar visível e habilitado antes do clique. */
 async function clicar(seletor: string): Promise<void> {
   const botao = await pagina.waitForSelector(`${seletor}:enabled`, { visible: true });
   assert(botao);
   await botao.click();
 }
 
+/** Encontra o campo habilitado e dispara os eventos que o React usa para receber o valor. */
 async function preencher(seletor: string, valor: string, indiceDaLinha?: number): Promise<void> {
   const alvo = await pagina.waitForFunction((campo, linhas, indice) => {
     // Com índice, a busca pelo campo acontece dentro da linha escolhida.
@@ -119,18 +125,21 @@ async function preencher(seletor: string, valor: string, indiceDaLinha?: number)
   }, valor);
 }
 
+/** Espera o conteúdo esperado no elemento que o seletor e a posição indicam. */
 async function conferirTexto(seletor: string, esperado: string, indice = 0): Promise<void> {
   await pagina.waitForFunction((alvo, texto, posicao) =>
     document.querySelectorAll(alvo)[posicao]?.textContent?.trim() === texto,
   {}, seletor, esperado, indice);
 }
 
+/** Recupera pelo nome a turma já preparada com o ID real da API de teste. */
 function obterTurmaDoCenario(nome: string): TurmaDoCenario {
   const turma = turmasDoCenario.get(nome);
   assert(turma, `Turma ainda não preparada: ${nome}`);
   return turma;
 }
 
+/** Cria a turma na API e guarda a rota de lembretes para os próximos passos. */
 async function cadastrarTurmaDoCenario(nome: string): Promise<void> {
   const identificacao = /^(\d{4})\.([12]) de (.+)$/.exec(nome);
   assert(identificacao, `Identificação de turma inválida: ${nome}`);
@@ -146,6 +155,7 @@ async function cadastrarTurmaDoCenario(nome: string): Promise<void> {
   });
 }
 
+/** Prepara lembretes pendentes pela API para que o teste comece com uma configuração salva. */
 async function prepararLembretes(nome: string, datas: string[]): Promise<void> {
   const turma = obterTurmaDoCenario(nome);
   const lembretes = datas.map((data, indice) => {
@@ -164,6 +174,7 @@ async function prepararLembretes(nome: string, datas: string[]): Promise<void> {
   turma.anterior = await resposta.json();
 }
 
+/** Inicia uma API própria para cada cenário, com o arquivo de dados em uma pasta isolada. */
 Before({ tags, timeout: 30_000 }, async function () {
   turmasDoCenario.clear();
   pasta = mkdtempSync(join(tmpdir(), 'ta-lembretes-gui-'));
@@ -191,6 +202,7 @@ Before({ tags, timeout: 30_000 }, async function () {
   api = `http://127.0.0.1:${endereco.port}`;
 });
 
+/** Encerra a API e o navegador, libera o relógio simulado e limpa os dados do cenário. */
 After({ tags, timeout: 30_000 }, async function () {
   try {
     await navegador?.close();
@@ -210,7 +222,7 @@ After({ tags, timeout: 30_000 }, async function () {
   }
 });
 
-Given('a data atual é {string}', { timeout: 30_000 }, async (data: string) => {
+Given('a data atual é {string}', { timeout: 30_000 }, async function (data: string) {
   const agora = new Date(dataParaCampo(data));
   assert.equal(Intl.DateTimeFormat().resolvedOptions().timeZone, fuso);
   mock.timers.enable({ apis: ['Date'], now: agora });
@@ -218,7 +230,7 @@ Given('a data atual é {string}', { timeout: 30_000 }, async (data: string) => {
 
   navegador = await launch({
     executablePath: process.env.CHROME_BIN,
-    headless: true,
+    headless: this.parameters.janela !== true, // A opção do Cucumber abre a janela só na demonstração.
     args: ['--no-sandbox', '--disable-dev-shm-usage']
   });
   pagina = await navegador.newPage();
@@ -372,6 +384,7 @@ Given('a turma {string} possui dois lembretes não enviados para {string} e {str
     prepararLembretes(turma, [primeiraData, segundaData])
 );
 
+/** Prepara um lembrete já enviado e os pendentes diretamente no domínio da API isolada. */
 async function prepararLembretesComEnvio(
   nome: string,
   dataEnviada: string,

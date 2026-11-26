@@ -45,14 +45,17 @@ export class Class {
     return this.configuracaoLembretes; // Permite acessar os lembretes da turma pelas operações da configuração.
   }
 
+  /** Consulta a agenda original da turma pela data e pelo horário. */
   buscarLembretesPorDataEHorario(data: string, horario: string): Lembrete[] {
     return this.configuracaoLembretes.buscarLembretesPorDataEHorario(data, horario);
   }
 
+  /** Fornece cópias para a seleção dos lembretes que o agendador vai processar. */
   listarLembretes(): Lembrete[] {
     return this.configuracaoLembretes.listar();
   }
 
+  // As operações abaixo delegam as transições à configuração da própria turma.
   marcarLembreteComoEnviado(id: string): void {
     this.configuracaoLembretes.marcarComoEnviado(id);
   }
@@ -69,18 +72,22 @@ export class Class {
     this.configuracaoLembretes.cancelar(id, motivo);
   }
 
+  /** Converte os lembretes da turma para as respostas da API e a persistência. */
   serializarLembretes(): ReturnType<ConfiguracaoLembretes['toJSON']> {
     return this.configuracaoLembretes.toJSON();
   }
 
+  /** Recompõe a configuração com as entidades já reconstruídas a partir do arquivo de dados. */
   restaurarLembretes(lembretes: readonly Lembrete[]): void {
     lembretes.forEach(lembrete => this.configuracaoLembretes.add(lembrete));
   }
 
+  /** Consulta a configuração da própria turma para verificar a compatibilidade com o prazo proposto. */
   possuiAgendamentosPendentesApos(novoPrazo: Date): boolean {
     return this.configuracaoLembretes.possuiAgendamentosPendentesApos(novoPrazo);
   }
 
+  /** Valida uma cópia da configuração para a rota poder gravar a proposta antes de aplicá-la em memória. */
   prepararConfiguracaoLembretes(
     quantidade: number,
     propostas: readonly LembreteProposto[],
@@ -92,6 +99,7 @@ export class Class {
     return candidata;
   }
 
+  /** Delega à configuração em memória a validação e a aplicação do conjunto final. */
   atualizarLembretes(
     quantidade: number,
     propostas: readonly LembreteProposto[],
@@ -129,6 +137,7 @@ export class Class {
     this.topic = topic;
   }
 
+  /** Verifica a compatibilidade dos lembretes pendentes antes de vincular a turma a outro período. */
   definirPeriodoAcademico(periodo: PeriodoAcademico): void {
     if (periodo === this.periodoAcademico) return; // Editar outros dados da turma não troca sua associação atual.
     const prazo = periodo.getPrazoAcademico();
@@ -151,6 +160,7 @@ export class Class {
     return this.periodoAcademico.prazoEncerrado(instanteAtual); // Reutiliza a regra do período, sem duplicar a comparação.
   }
 
+  /** Lista, para cada matrícula, as metas esperadas que ainda estão sem avaliação registrada. */
   identificarPendencias(): { alunoCpf: string; nomeAluno: string; meta: string }[] {
     return this.enrollments.flatMap(matricula => {
       const aluno = matricula.getStudent();

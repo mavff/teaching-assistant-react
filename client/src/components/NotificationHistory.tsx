@@ -21,6 +21,7 @@ const horaEmBrasilia = new Intl.DateTimeFormat('pt-BR', {
   hour12: false
 });
 
+/** Usa o mesmo formato de data e hora na lista e nos detalhes. */
 function formatarDataHora(dataHora: string): string {
   const instante = new Date(dataHora);
   return `${dataEmBrasilia.format(instante)} às ${horaEmBrasilia.format(instante)}`;
@@ -31,6 +32,7 @@ type EstadoDetalhes =
   | { tipo: 'erro' }
   | { tipo: 'pronto'; registro: DetalhesHistoricoNotificacao };
 
+/** Busca pelo ID os dados registrados na tentativa quando a linha é aberta. */
 function DetalhesNotificacao({ id }: { id: number }) {
   const [estado, setEstado] = useState<EstadoDetalhes>({ tipo: 'carregando' });
 
@@ -104,11 +106,12 @@ type EstadoHistorico =
   | { tipo: 'erro' }
   | { tipo: 'pronto'; registros: LinhaHistoricoNotificacao[] };
 
+/** Extrai a disciplina do nome registrado pelo agendador no formato ano.semestre de disciplina. */
 function disciplinaDaTurma(turma: string): string {
-  // O agendador registra a turma no formato "ano.semestre de disciplina".
   return /^\d{4}\.[12] de (.+)$/.exec(turma)?.[1] ?? '';
 }
 
+/** Aplica os filtros selecionados e aceita todos os valores de um filtro vazio. */
 function correspondeAosFiltros(
   registro: LinhaHistoricoNotificacao,
   disciplina: string,
@@ -118,6 +121,7 @@ function correspondeAosFiltros(
     (!turma || registro.contexto === turma);
 }
 
+/** Carrega o histórico do agendador e mantém os filtros e a linha expandida na tela. */
 export default function NotificationHistory() {
   const [estado, setEstado] = useState<EstadoHistorico>({ tipo: 'carregando' });
   const [idAberto, setIdAberto] = useState<number | null>(null);
@@ -141,6 +145,7 @@ export default function NotificationHistory() {
   const disciplinas = Array.from(new Set(
     registros.map(registro => disciplinaDaTurma(registro.contexto)).filter(Boolean)
   )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  // As opções de turma acompanham a disciplina selecionada.
   const turmas = Array.from(new Set(
     registros
       .filter(registro => correspondeAosFiltros(registro, disciplinaFiltro, ''))
@@ -150,11 +155,11 @@ export default function NotificationHistory() {
     correspondeAosFiltros(registro, disciplinaFiltro, turmaFiltro)
   );
 
+  /** Atualiza os filtros e recolhe a linha aberta quando ela deixa de aparecer no resultado. */
   function aplicarFiltros(disciplina: string, turma: string): void {
     setDisciplinaFiltro(disciplina);
     setTurmaFiltro(turma);
 
-    // Recolhe os detalhes quando a tentativa selecionada sai do resultado.
     setIdAberto(atual => registros.some(registro =>
       registro.id === atual && correspondeAosFiltros(registro, disciplina, turma)
     ) ? atual : null);

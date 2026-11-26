@@ -131,7 +131,7 @@ describe('Prazo acadêmico da turma', () => {
 
 /**
  * Teste unitário de Class: protege o isolamento das configurações entre turmas.
- * Apoia o cenário de alteração sem afetar outra turma; não executa GUI, HTTP ou persistência.
+ * As duas turmas compartilham o prazo do período e mantêm configurações de lembretes próprias.
  */
 describe('Configuração de lembretes da turma', () => {
   test('configura um lembrete em uma turma sem modificar outra do mesmo semestre', () => {

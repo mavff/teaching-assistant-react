@@ -3,11 +3,13 @@ import { Lembrete, LembreteProposto } from './Lembrete';
 export class ConfiguracaoLembretes {
   private lembretes: Lembrete[];
 
+  /** Valida os IDs e inicializa a configuração com cópias dos lembretes recebidos. */
   constructor(lembretes: readonly Lembrete[] = []) {
     ConfiguracaoLembretes.validarIdentificadores(lembretes.map(lembrete => lembrete.getId()));
-    this.lembretes = lembretes.map(lembrete => lembrete.copiar()); // Não mantém referências que permitam modificar a configuração externamente.
+    this.lembretes = lembretes.map(lembrete => lembrete.copiar());
   }
 
+  /** Devolve cópias para proteger os lembretes armazenados durante consultas. */
   listar(): Lembrete[] {
     return this.lembretes.map(lembrete => lembrete.copiar()); // A quantidade é derivada desta lista; não existe um atributo de quantidade separado.
   }
@@ -28,13 +30,15 @@ export class ConfiguracaoLembretes {
     this.lembretes.push(lembrete.copiar());
   }
 
+  /** Remove pelo ID após conferir se o estado do lembrete armazenado permite a remoção. */
   remove(lembrete: Lembrete): void {
     const index = this.lembretes.findIndex(item => item.getId() === lembrete.getId());
     if (index === -1) throw new Error('Lembrete não encontrado na configuração');
-    ConfiguracaoLembretes.validarEdicao(this.lembretes[index]); // Verifica a entidade armazenada, não o estado fornecido no argumento.
+    ConfiguracaoLembretes.validarEdicao(this.lembretes[index]);
     this.lembretes.splice(index, 1);
   }
 
+  // As quatro transições abaixo localizam pelo ID a entidade guardada na configuração.
   marcarComoEnviado(id: string): void {
     this.obterLembreteArmazenado(id).marcarComoEnviado();
   }
@@ -64,6 +68,7 @@ export class ConfiguracaoLembretes {
       .map(lembrete => lembrete.copiar()); // Datas iguais não tornam identidades diferentes duplicadas; a busca não filtra estados.
   }
 
+  /** Verifica se um lembrete pendente tem agendamento original ou reenvio após o novo prazo. */
   possuiAgendamentosPendentesApos(novoPrazo: Date): boolean {
     if (!Number.isFinite(novoPrazo.getTime())) throw new Error('Prazo acadêmico inválido');
     return this.lembretes.some(lembrete => {
@@ -71,9 +76,10 @@ export class ConfiguracaoLembretes {
       const reenvio = lembrete.getProximoReenvioEm();
       return lembrete.getAgendamento().getTime() > novoPrazo.getTime()
         || (reenvio !== null && reenvio.getTime() > novoPrazo.getTime());
-    }); // Consulta agendamento e reenvio dos pendentes sem alterar estados, consultar o relógio ou processar envios.
+    });
   }
 
+  /** Valida o conjunto final em cópias e troca a configuração só depois de validar todos os candidatos. */
   atualizar(quantidade: number, propostas: readonly LembreteProposto[], instanteAtual: Date, prazoAcademico: Date): void {
     if (!Number.isSafeInteger(quantidade) || quantidade < 0) throw new Error('Quantidade de lembretes inválida');
     if (propostas.length !== quantidade || propostas.some(proposta => !proposta.data || !proposta.horario)) {
@@ -106,14 +112,16 @@ export class ConfiguracaoLembretes {
       return candidato; // Agendamentos existentes inalterados não são rejeitados apenas por terem passado do horário.
     });
 
-    this.lembretes = candidatos; // Aplica o conjunto somente depois de validar todos os candidatos; uma falha anterior não altera a configuração.
+    this.lembretes = candidatos;
   }
 
+  /** Exige IDs preenchidos e únicos para identificar cada lembrete, mesmo com horários iguais. */
   private static validarIdentificadores(ids: readonly string[]): void {
     if (ids.some(id => typeof id !== 'string' || !id.trim())) throw new Error('Identificador do lembrete inválido');
     if (new Set(ids).size !== ids.length) throw new Error('Identificador de lembrete duplicado');
   }
 
+  /** Protege lembretes enviados e os estados cuja regra de edição ainda está em aberto. */
   private static validarEdicao(lembrete: Lembrete): void {
     if (lembrete.jaFoiEnviado()) throw new Error('Lembretes enviados não podem ser alterados');
     if (lembrete.getEstado() === 'Ignorado' || lembrete.getEstado() === 'Cancelado') {

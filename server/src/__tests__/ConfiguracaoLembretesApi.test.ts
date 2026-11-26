@@ -9,7 +9,7 @@ import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from '../models/Especificac
 
 /**
  * Integração HTTP: cobre o primeiro cenário de configuração e as rejeições que devem preservar os dados.
- * Usa armazenamento em memória; a gravação e a recuperação reais serão verificadas em pasta temporária.
+ * Usa armazenamento em memória. A gravação em disco é verificada em NotificacaoPersistencia.test.ts.
  */
 describe('API de configuração de lembretes', () => {
   const rota = '/api/classes/ESS-2099-2/lembretes';
@@ -21,6 +21,7 @@ describe('API de configuração de lembretes', () => {
     ]
   };
 
+  /** Recria duas turmas do mesmo período e cadastra o destinatário exigido pela rota. */
   beforeEach(() => {
     classes.definirEmailDasTurmas('contato@example.com'); // Prepara uma aplicação com o pré-requisito de cadastro atendido.
     classes.getAllClasses().forEach(turma => classes.removeClass(turma.getClassId()));

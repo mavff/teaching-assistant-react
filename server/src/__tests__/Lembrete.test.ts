@@ -2,7 +2,7 @@ import { Lembrete } from '../models/Lembrete';
 
 /**
  * Testes unitários de Lembrete: validam agendamentos e preservam identidade e estado.
- * Apoiam os cenários de alteração, bloqueio de enviados e rejeição de datas; não executam GUI ou envios.
+ * Usam instantes fixos para conferir os limites de uma alteração e a proteção do lembrete enviado.
  */
 describe('Lembrete', () => {
   const instanteAtual = new Date('2026-08-20T08:00:00.000Z'); // Relógio fornecido pelo teste, independente do dia em que for executado.

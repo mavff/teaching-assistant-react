@@ -14,6 +14,7 @@ test('recupera o lembrete enviado e seu histórico após reiniciar', () => {
   const pastaAnterior = process.cwd();
   const ambienteAnterior = process.env.NODE_ENV;
 
+  /** Carrega uma nova instância do servidor que relê o mesmo arquivo de dados. */
   const carregarServidor = (): typeof import('../server') => {
     let servidor!: typeof import('../server');
     jest.isolateModules(() => { servidor = require('../server'); });

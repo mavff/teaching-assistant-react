@@ -6,6 +6,7 @@ type PendenciaRegistrada = {
   meta: string;
 };
 
+/** Confere os campos de uma pendência lida do arquivo antes de reconstruir o registro. */
 const pendenciaValida = (valor: unknown): valor is PendenciaRegistrada =>
   typeof valor === 'object' && valor !== null &&
   'nomeAluno' in valor && typeof valor.nomeAluno === 'string' &&
@@ -26,6 +27,7 @@ export class Notificacao {
   private readonly prazoRegistradoEmMs: number | null;
   private readonly pendencias: PendenciaRegistrada[];
 
+  /** Guarda uma cópia do prazo e das pendências do lembrete para preservar como era a tentativa. */
   constructor(
     readonly id: number,
     readonly nomeDestinatario: string,
@@ -57,6 +59,7 @@ export class Notificacao {
     return this.pendencias.map(pendencia => ({ ...pendencia }));
   }
 
+  /** Serializa as datas e os dados registrados no momento do processamento. */
   toJSON() {
     return {
       id: this.id,
@@ -73,6 +76,7 @@ export class Notificacao {
     };
   }
 
+  /** Valida o registro persistido e reconstrói seu contexto de grupo ou de lembrete. */
   static fromJSON(dados: unknown): Notificacao {
     if (typeof dados !== 'object' || dados === null) {
       throw new Error('Registro de notificação inválido');

@@ -12,6 +12,7 @@ import { Student } from '../models/Student';
 
 /** Integração do cenário de envio com transporte simulado e histórico em memória. */
 describe('Processamento do lembrete de notas pendentes', () => {
+  // Cada caso controla seu próprio instante de processamento.
   afterEach(() => {
     jest.useRealTimers();
   });

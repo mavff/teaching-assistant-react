@@ -17,6 +17,7 @@ describe('Lembretes automáticos no servidor', () => {
   const servidores: Server[] = [];
   let pasta: string;
 
+  /** Isola o arquivo de dados e controla o relógio usado pelo agendador. */
   beforeEach(() => {
     pasta = fs.mkdtempSync(join(tmpdir(), 'ta-lembretes-automaticos-'));
     process.chdir(pasta);
@@ -29,6 +30,7 @@ describe('Lembretes automáticos no servidor', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
+  /** Para os agendadores e restaura o ambiente para iniciar o próximo caso. */
   afterEach(() => {
     for (const servidor of servidores.splice(0)) servidor.emit('close');
     jest.useRealTimers();
@@ -38,6 +40,7 @@ describe('Lembretes automáticos no servidor', () => {
     fs.rmSync(pasta, { recursive: true, force: true });
   });
 
+  /** Grava os dados iniciais da turma com a possibilidade de deixar Design sem nota. */
   function prepararDados(todasAsNotas = false) {
     fs.mkdirSync('data');
     fs.writeFileSync('data/app-data.json', JSON.stringify({
@@ -61,6 +64,7 @@ describe('Lembretes automáticos no servidor', () => {
     }));
   }
 
+  /** Sobe uma nova instância com o SMTP simulado para testar a recuperação após reiniciar. */
   function iniciar() {
     let aplicacao!: typeof import('../server');
     let send!: jest.SpyInstance;
@@ -83,6 +87,7 @@ describe('Lembretes automáticos no servidor', () => {
     return { ...aplicacao, send, parar: () => servidor.emit('close') };
   }
 
+  /** Usa os mesmos campos persistidos para comparar os registros antes e depois do reinício. */
   const resumoDoHistorico = (servidor: typeof import('../server')) =>
     servidor.historicoLembretes.listar().map(registro => registro.toJSON());
 

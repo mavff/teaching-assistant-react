@@ -4,7 +4,7 @@ import { PeriodoAcademico } from '../models/PeriodoAcademico';
 
 /**
  * Testes unitários do período: validam prazo e rejeitam conflitos com suas configurações.
- * Implementam as decisões do DDD; o compartilhamento entre turmas e a persistência serão integrados depois.
+ * Comparam o instante exato do prazo e incluem agendamentos originais e reenvios na verificação de conflitos.
  */
 describe('PeriodoAcademico', () => {
   const instanteAtual = new Date('2026-08-20T08:00:00.000Z');

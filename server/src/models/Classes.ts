@@ -9,12 +9,14 @@ export class Classes {
     // Classes management is independent of persistence
   }
 
+  /** Consulta o endereço compartilhado que o agendador usa como destinatário. */
   obterEmailDasTurmas(): string | null {
-    return this.emailDasTurmas; // Consulta o endereço compartilhado pelo conjunto de turmas.
+    return this.emailDasTurmas;
   }
 
+  /** Guarda o endereço compartilhado após validar o formato e retirar espaços externos. */
   definirEmailDasTurmas(email: string): void {
-    this.emailDasTurmas = Classes.validarEmailDasTurmas(email); // Só substitui o endereço após validar.
+    this.emailDasTurmas = Classes.validarEmailDasTurmas(email);
   }
 
   static validarEmailDasTurmas(email: unknown): string {

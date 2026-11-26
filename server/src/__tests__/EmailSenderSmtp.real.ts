@@ -1,6 +1,7 @@
 import { EmailSenderSmtp } from '../models/EmailSender';
 
 // Executado separadamente para validar a aceitação SMTP do Gmail.
+// Envia uma mensagem real ao endereço definido em EMAIL_SMTP_TEST_TO.
 describe('EmailSenderSmtp com Gmail', () => {
   it('recebe a confirmação SMTP para uma mensagem de notas pendentes', async () => {
     const destinatario = process.env.EMAIL_SMTP_TEST_TO?.trim();

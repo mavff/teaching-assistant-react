@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import AcademicPeriodService from '../services/AcademicPeriodService';
 
+/** Adapta o prazo recebido da API para o campo de data e hora no fuso do navegador. */
 const toLocalInputValue = (value: string | null): string => {
   if (value === null) return '';
   const date = new Date(value);
@@ -26,6 +27,7 @@ const AcademicPeriodSettings: React.FC = () => {
 
     let active = true; // Identifica se a consulta ainda pertence ao período apresentado pelo componente.
     setIsLoading(true);
+    /** Consulta o prazo que pertence ao ano e semestre selecionados. */
     const loadPeriod = async () => {
       try {
         const period = await AcademicPeriodService.getPeriod(selectedYear, Number(semester));
@@ -48,6 +50,7 @@ const AcademicPeriodSettings: React.FC = () => {
     setSuccess('');
   };
 
+  /** Salva o instante em ISO para o período escolhido e apresenta o valor confirmado pela API. */
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault(); // Envia pela API sem recarregar a página.
     if (isLoading || isSaving) return; // Aguarda a consulta terminar e impede envios simultâneos.
