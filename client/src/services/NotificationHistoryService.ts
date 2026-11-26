@@ -11,6 +11,7 @@ export interface LinhaHistoricoNotificacao {
 
 export interface DetalhesHistoricoNotificacao extends LinhaHistoricoNotificacao {
   destinatario: string;
+  descricaoFalha?: string;
   prazoRegistrado: string | null;
   pendenciasRegistradas: { nomeAluno: string; meta: string }[];
 }

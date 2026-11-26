@@ -61,15 +61,15 @@ Feature: Notificações de pendências no lançamento de notas
   
    
    @gui
-   # DDD (regra central representada): consultarDetalhesNotificacao usa buscar(idNotificacao) e devolve nomeDestinatario, turmaRegistrada, dataHora, motivo, resultado e descricaoFalha do registro selecionado, preservando a falha original e todos os dados.
+   # DDD (regra central representada): a consulta pelo ID devolve descricaoFalha do registro da tentativa.
+   # Validação: completa (Chrome/Cucumber, perfil historicoGui).
    Scenario: Visualização de uma falha no próprio histórico
-      Given o professor "Paulo Borba" está na tela "Histórico de notificações"
-      And existe uma tentativa de envio de notificação para "Paulo Borba" da turma "2026.2 de ESS", registrada em "23/08/2026 às 09:00", com motivo "Notas pendentes", status "Falha" e descrição da falha "Tempo limite excedido no envio"
-      When "Paulo Borba" seleciona a tentativa de envio de "23/08/2026 às 09:00" da turma "2026.2 de ESS"
-      Then "Paulo Borba" é direcionado à tela "Detalhes da notificação"
-      And são apresentados o professor "Paulo Borba", a turma "2026.2 de ESS", a data "23/08/2026 às 09:00", o motivo "Notas pendentes" e o status "Falha"
-      And é apresentada a descrição da falha "Tempo limite excedido no envio"
-
+      Given existe uma tentativa com falha para "professor@example.test" na turma "2026.2 de ESS", registrada em "23/08/2026 às 09:00", com motivo "Notas pendentes", prazo "31/08/2026 às 23:59" e descrição da falha "Tempo limite excedido no envio"
+      And o professor está na tela "Histórico de notificações"
+      When o professor seleciona a notificação de "23/08/2026 às 09:00" da turma "2026.2 de ESS"
+      Then os detalhes da notificação são exibidos abaixo da linha selecionada
+      And os detalhes mostram o destinatário "professor@example.test", a turma "2026.2 de ESS", a data "23/08/2026 às 09:00", o motivo "Notas pendentes", o status "Falha" e o prazo "31/08/2026 às 23:59"
+      And os detalhes mostram a descrição da falha "Tempo limite excedido no envio"
 
 
    @lembretes-configuracao-gui

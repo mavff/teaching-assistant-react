@@ -31,7 +31,8 @@ module.exports = {
     paths: ['../features/Notificacao_falta_cadastrar_alguma_nota.feature'],
     name: [
       '^Visualização do histórico de notificações$',
-      '^Visualização dos detalhes históricos de uma notificação$'
+      '^Visualização dos detalhes históricos de uma notificação$',
+      '^Visualização de uma falha no próprio histórico$'
     ],
     requireModule: ['ts-node/register/transpile-only'],
     require: ['src/step-definitions/historico-gui-steps.ts'],

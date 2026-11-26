@@ -67,6 +67,12 @@ function DetalhesNotificacao({ id }: { id: number }) {
             <dd data-cy="historico-detalhe-motivo">{estado.registro.motivo}</dd>
             <dt>Status</dt>
             <dd data-cy="historico-detalhe-status">{estado.registro.resultado}</dd>
+            {estado.registro.resultado === 'Falha' && estado.registro.descricaoFalha && (
+              <>
+                <dt>Descrição da falha</dt>
+                <dd data-cy="historico-detalhe-descricao-falha">{estado.registro.descricaoFalha}</dd>
+              </>
+            )}
             <dt>Prazo registrado</dt>
             <dd data-cy="historico-detalhe-prazo">
               {estado.registro.prazoRegistrado

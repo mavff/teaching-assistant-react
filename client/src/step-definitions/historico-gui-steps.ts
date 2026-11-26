@@ -10,7 +10,8 @@ import type { HistoricoNotificacoes } from '../../../server/src/models/Historico
 
 const nomesDosCenarios = new Set([
   'Visualização do histórico de notificações',
-  'Visualização dos detalhes históricos de uma notificação'
+  'Visualização dos detalhes históricos de uma notificação',
+  'Visualização de uma falha no próprio histórico'
 ]);
 
 let pasta: string | undefined;
@@ -290,3 +291,36 @@ Then('os detalhes preservam a pendência de {string} em {string}',
     }, {}, idSelecionado, `${aluno} — ${meta}`);
   }
 );
+
+Given(
+  'existe uma tentativa com falha para {string} na turma {string}, registrada em {string}, com motivo {string}, prazo {string} e descrição da falha {string}',
+  (destinatario: string, turma: string, data: string, motivo: string, prazo: string, descricao: string) => {
+    const id = historico.proximoId();
+
+    // Registra a tentativa fictícia antes que o navegador carregue o histórico.
+    historico.registrar(new Notificacao(
+      id,
+      destinatario,
+      {
+        lembreteId: `lembrete-${id}`,
+        turmaRegistrada: turma,
+        prazoRegistrado: instanteEmBrasilia(prazo),
+        pendenciasRegistradas: []
+      },
+      instanteEmBrasilia(data),
+      'Falha',
+      motivo,
+      descricao
+    ));
+  }
+);
+
+Then('os detalhes mostram a descrição da falha {string}', async (descricao: string) => {
+  assert(idSelecionado);
+  const seletor = `[data-cy="historico-detalhes-${idSelecionado}"] [data-cy="historico-detalhe-descricao-falha"]`;
+
+  // Confere a descrição exata dentro da linha que o professor abriu.
+  await pagina.waitForFunction((alvo, esperado) =>
+    document.querySelector(alvo)?.textContent?.trim() === esperado,
+  {}, seletor, descricao);
+});
