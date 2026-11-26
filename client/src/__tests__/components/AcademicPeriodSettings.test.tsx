@@ -11,11 +11,12 @@ describe('Formulário de prazo acadêmico', () => {
   const originalFetch = global.fetch;
   const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
   const deadlineLabel = 'Data e horário limite para lançamento das notas';
+  /** Simula o status e o corpo JSON usados pelo cliente da API de períodos. */
   const response = (status: number, body: unknown): Response => ({
     ok: status >= 200 && status < 300,
     status,
     json: async () => body
-  } as Response); // Fornece as partes da resposta HTTP usadas pelo serviço, sem abrir conexões reais.
+  } as Response);
 
   beforeEach(() => {
     fetchMock.mockReset();

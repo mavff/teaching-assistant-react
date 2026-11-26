@@ -3,7 +3,7 @@ import { Notificacao } from '../models/Notificacao';
 
 /**
  * Testes de domínio do registro histórico dos lembretes.
- * Cobrem o contexto preservado e a identidade de cada tentativa de envio.
+ * Conferem que as cópias preservam o contexto e que o mesmo lembrete pode ter tentativas com IDs distintos.
  */
 describe('Notificação de lembrete', () => {
   test('preserva o prazo e as pendências que foram informados no aviso', () => {

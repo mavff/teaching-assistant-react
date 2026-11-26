@@ -3,7 +3,7 @@ import { EstadoLembrete, Lembrete, LembreteProposto } from '../models/Lembrete';
 
 /**
  * Testes unitários da configuração: quantidade, edição e rejeição sem alterações parciais.
- * Apoiam os cenários GUI de configuração; persistência, HTTP e interação com a tela não são executados aqui.
+ * Comparam as identidades, datas e estados para confirmar quais registros uma proposta alterou ou preservou.
  */
 describe('ConfiguracaoLembretes', () => {
   const instanteAtual = new Date('2026-08-20T08:00:00.000Z');
