@@ -8,6 +8,7 @@ import { NotificacaoService } from '../models/NotificacaoService';
 import { PeriodoAcademico } from '../models/PeriodoAcademico';
 import { Student } from '../models/Student';
 
+// O Nodemailer usa este mock para devolver aceitações ou falhas definidas por cada caso.
 const mockSendMail = jest.fn();
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(() => ({ sendMail: mockSendMail }))
