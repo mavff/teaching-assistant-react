@@ -1,6 +1,9 @@
 import React from 'react';
 import { Notificacao } from '../../services/GrupoService';
 
+/** Resultado que o servidor grava quando o e-mail não foi aceito (valor do domínio, não traduzir). */
+const RESULTADO_FALHA = 'Falha';
+
 const ROTULOS_TIPO: Record<string, string> = {
   alocacao: 'Allocation',
   aviso: 'Notice',
@@ -31,7 +34,7 @@ const ListaNotificacoes: React.FC<{ notificacoes: Notificacao[] }> = ({ notifica
           </span>
           <span>
             <span className="gp-grupo-tag">{n.grupo}</span>
-            {n.resultado === 'Failed' && <span className="gp-falha" title={n.descricaoFalha}>Failed</span>}
+            {n.resultado === RESULTADO_FALHA && <span className="gp-falha" title={n.descricaoFalha}>Failed</span>}
           </span>
         </li>
       ))}

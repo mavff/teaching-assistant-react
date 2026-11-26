@@ -209,6 +209,19 @@ describe('GUI de notificação de alocação de monitor e aluno', () => {
     expect(lista.getByText('in group')).toBeInTheDocument();
   });
 
+  it('marca como Failed, com o motivo, a notificação que o servidor registrou como Falha', async () => {
+    estado([g3], [joao], [
+      alocacao(1, 'Mariana'),
+      { ...alocacao(2, 'Pedro'), resultado: 'Falha', descricaoFalha: 'Informe um único endereço de e-mail válido.' }
+    ]);
+    render(<Grupos />);
+
+    const etiqueta = await screen.findByText('Failed');
+    expect(etiqueta).toHaveAttribute('title', 'Informe um único endereço de e-mail válido.');
+    expect(within(etiqueta.closest('li') as HTMLElement).getByText('Pedro')).toBeInTheDocument();
+    expect(screen.getAllByText('Failed')).toHaveLength(1);
+  });
+
   it('usa "in groups" para monitor responsável por mais de um grupo', async () => {
     estado([], [{ ...joao, situacao: 'alocado', grupos: ['ESS-G3', 'ESS-G7'] }], []);
     render(<Grupos />);
