@@ -455,6 +455,7 @@ describe('Server API - Student Endpoints', () => {
   });
 });
 
+/** Verifica a exigência do e-mail compartilhado no cadastro de turmas e de lembretes. */
 describe('API do e-mail das turmas', () => {
   test('cadastra e atualiza o endereço compartilhado', async () => {
     const rota = '/api/classes/email';
