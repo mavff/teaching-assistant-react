@@ -321,6 +321,30 @@ app.get('/api/notificacoes/historico', (_req: Request, res: Response) => {
   res.json(registros);
 });
 
+app.get('/api/notificacoes/historico/:id', (req: Request, res: Response) => {
+  const id = /^[1-9]\d*$/.test(req.params.id) ? Number(req.params.id) : NaN;
+  const registro = Number.isSafeInteger(id) ? historicoLembretes.buscar(id) : undefined;
+
+  if (!registro || registro.turmaRegistrada === null) {
+    res.status(404).json({ error: 'Notificação não encontrada' });
+    return;
+  }
+
+  // A consulta devolve o contexto guardado na tentativa.
+  res.json({
+    id: registro.id,
+    origem: 'lembrete',
+    contexto: registro.turmaRegistrada,
+    dataHora: registro.dataHora.toISOString(),
+    motivo: registro.motivo,
+    resultado: registro.resultado,
+    destinatario: registro.nomeDestinatario,
+    descricaoFalha: registro.descricaoFalha,
+    prazoRegistrado: registro.prazoRegistrado?.toISOString() ?? null,
+    pendenciasRegistradas: registro.pendenciasRegistradas
+  });
+});
+
 const apresentarConfiguracaoLembretes = (turma: Class) => ({
   turmaId: turma.getClassId(),
   prazoAcademico: turma.getPrazoAcademico()?.toISOString() ?? null,

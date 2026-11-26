@@ -31,45 +31,45 @@ Feature: Notificações de pendências no lançamento de notas
       And é apresentada a notificação da turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
 
    @gui
-   # DDD (regra central representada): A consulta por id devolve pendenciasRegistradas e prazoRegistrado da tentativa; o prazo é copiado da Class ao registrar a notificação e a lista permanece igual após o cadastro das notas.
+   # DDD (regra central representada): a consulta pelo ID usa HistoricoNotificacoes.buscar e devolve os dados registrados na tentativa.
+   # Validação: completa (Chrome/Cucumber, perfil historicoGui).
    Scenario: Visualização dos detalhes históricos de uma notificação
-      Given o professor "Paulo Borba" está na tela "Histórico de notificações"
-      And existe uma notificação de "Paulo Borba" para a turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes", status "Enviado" e prazo "31/08/2026 às 23:59"
-      And as pendências registradas nessa notificação são "João da Silva - Prova 2" e "Maria Souza - Projeto 1"
-      And as notas atuais são "8,0" para "João da Silva - Prova 2" e "9,0" para "Maria Souza - Projeto 1", cadastradas em "26/08/2026 às 10:00"
-      When "Paulo Borba" seleciona a notificação de "25/08/2026 às 09:00" da turma "2026.2 de ESS"
-      Then "Paulo Borba" é direcionado à tela "Detalhes da notificação"
-      And são apresentados o professor "Paulo Borba", a turma "2026.2 de ESS", a data "25/08/2026 às 09:00", o motivo "Notas pendentes", o status "Enviado" e o prazo "31/08/2026 às 23:59"
-      And a notificação de "25/08/2026 às 09:00" apresenta "João da Silva" sem nota cadastrada em "Prova 2", mesmo após o cadastro da nota "8,0" em "26/08/2026 às 10:00"
-      And a notificação de "25/08/2026 às 09:00" apresenta "Maria Souza" sem nota cadastrada em "Projeto 1", mesmo após o cadastro da nota "9,0" em "26/08/2026 às 10:00"
+      Given existe uma notificação destinada a "professor@example.test" para a turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes", status "Enviado", prazo "31/08/2026 às 23:59" e pendências "João da Silva - Prova 2" e "Maria Souza - Projeto 1"
+      And depois foram lançados os conceitos "MPA" para "João da Silva - Prova 2" e "MA" para "Maria Souza - Projeto 1"
+      And o professor está na tela "Histórico de notificações"
+      When o professor seleciona a notificação de "25/08/2026 às 09:00" da turma "2026.2 de ESS"
+      Then os detalhes da notificação são exibidos abaixo da linha selecionada
+      And os detalhes mostram o destinatário "professor@example.test", a turma "2026.2 de ESS", a data "25/08/2026 às 09:00", o motivo "Notas pendentes", o status "Enviado" e o prazo "31/08/2026 às 23:59"
+      And os detalhes preservam a pendência de "João da Silva" em "Prova 2"
+      And os detalhes preservam a pendência de "Maria Souza" em "Projeto 1"
 
    
    @gui
-   # DDD (regra central representada): Services.filtrarHistorico coordena HistoricoNotificacoes.filtrar usando a identificação já existente em turmaRegistrada, com a disciplina e a turma selecionadas, preservando os demais registros.
+   # DDD (regra central representada): a aba filtra a listagem recebida usando a disciplina e a turma identificadas no rótulo histórico da tentativa.
+   # Validação: completa (Chrome/Cucumber, perfil historicoGui).
    Scenario: Filtragem do próprio histórico por disciplina e turma
-      Given o professor "Paulo Borba" está na tela "Histórico de notificações", sem filtros aplicados
-      And existe uma notificação de "Paulo Borba" para a turma "2026.2 de ESS", em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And existe uma notificação de "Paulo Borba" para a turma "2026.1 de ESS", em "20/02/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And existe uma notificação de "Paulo Borba" para a turma "2026.2 de Introdução a Programação", em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
-      When "Paulo Borba" filtra seu histórico pela disciplina "ESS" e turma "2026.2 de ESS"
-      Then "Paulo Borba" permanece na tela "Histórico de notificações"
-      And os filtros apresentados são a disciplina "ESS" e a turma "2026.2 de ESS"
-      And é apresentada a notificação de "Paulo Borba" da turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
-      And a notificação da turma "2026.1 de ESS", registrada em "20/02/2026 às 09:00", não é apresentada
-      And a notificação da turma "2026.2 de Introdução a Programação", registrada em "27/08/2026 às 09:00", não é apresentada
+      Given existe uma notificação para a turma "2026.2 de ESS", em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
+      And existe uma notificação para a turma "2026.1 de ESS", em "20/02/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
+      And existe uma notificação para a turma "2026.2 de Introdução a Programação", em "27/08/2026 às 09:00", com motivo "Notas pendentes" e status "Falha"
+      And o professor está na tela "Histórico de notificações"
+      And o histórico apresenta as turmas "2026.2 de Introdução a Programação", "2026.2 de ESS" e "2026.1 de ESS", nessa ordem
+      When o professor filtra o histórico pela disciplina "ESS" e pela turma "2026.2 de ESS"
+      Then os filtros apresentados são a disciplina "ESS" e a turma "2026.2 de ESS"
+      And o histórico apresenta somente a turma "2026.2 de ESS"
+      And é apresentada a notificação da turma "2026.2 de ESS", registrada em "25/08/2026 às 09:00", com motivo "Notas pendentes" e status "Enviado"
+      When o professor limpa os filtros do histórico
+      Then o histórico apresenta as turmas "2026.2 de Introdução a Programação", "2026.2 de ESS" e "2026.1 de ESS", nessa ordem
 
-  
-   
    @gui
-   # DDD (regra central representada): consultarDetalhesNotificacao usa buscar(idNotificacao) e devolve nomeDestinatario, turmaRegistrada, dataHora, motivo, resultado e descricaoFalha do registro selecionado, preservando a falha original e todos os dados.
+   # DDD (regra central representada): a consulta pelo ID devolve descricaoFalha do registro da tentativa.
+   # Validação: completa (Chrome/Cucumber, perfil historicoGui).
    Scenario: Visualização de uma falha no próprio histórico
-      Given o professor "Paulo Borba" está na tela "Histórico de notificações"
-      And existe uma tentativa de envio de notificação para "Paulo Borba" da turma "2026.2 de ESS", registrada em "23/08/2026 às 09:00", com motivo "Notas pendentes", status "Falha" e descrição da falha "Tempo limite excedido no envio"
-      When "Paulo Borba" seleciona a tentativa de envio de "23/08/2026 às 09:00" da turma "2026.2 de ESS"
-      Then "Paulo Borba" é direcionado à tela "Detalhes da notificação"
-      And são apresentados o professor "Paulo Borba", a turma "2026.2 de ESS", a data "23/08/2026 às 09:00", o motivo "Notas pendentes" e o status "Falha"
-      And é apresentada a descrição da falha "Tempo limite excedido no envio"
-
+      Given existe uma tentativa com falha para "professor@example.test" na turma "2026.2 de ESS", registrada em "23/08/2026 às 09:00", com motivo "Notas pendentes", prazo "31/08/2026 às 23:59" e descrição da falha "Tempo limite excedido no envio"
+      And o professor está na tela "Histórico de notificações"
+      When o professor seleciona a notificação de "23/08/2026 às 09:00" da turma "2026.2 de ESS"
+      Then os detalhes da notificação são exibidos abaixo da linha selecionada
+      And os detalhes mostram o destinatário "professor@example.test", a turma "2026.2 de ESS", a data "23/08/2026 às 09:00", o motivo "Notas pendentes", o status "Falha" e o prazo "31/08/2026 às 23:59"
+      And os detalhes mostram a descrição da falha "Tempo limite excedido no envio"
 
 
    @lembretes-configuracao-gui

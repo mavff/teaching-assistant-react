@@ -107,9 +107,9 @@ prevista no respectivo cenário.
 | Cenário | Tela inicial aprovada | Cobertura conceitual | Evidência e lacuna |
 | --- | --- | --- | --- |
 | [Visualização do histórico de notificações](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L22) | Turmas | Regra central representada | A rota `GET /api/notificacoes/historico` consulta diretamente `HistoricoNotificacoes.listar()` no histórico de lembretes. A tabela mostra os registros Enviado, Falha e Ignorado, com a turma e os dados registrados na época. Validado em Chrome/Cucumber (perfil historicoGui). |
-| [Visualização dos detalhes históricos de uma notificação](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L35) | Histórico de notificações | Regra central representada | Services.consultarDetalhesNotificacao usa buscar(idNotificacao) e devolve os dados da tentativa, incluindo pendenciasRegistradas e prazoRegistrado. NotificacaoService copia o prazo da Class ao compor o registro, pelas relações existentes. O cadastro posterior das notas preserva as pendências históricas. |
-| [Filtragem do próprio histórico por disciplina e turma](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L49) | Histórico de notificações — sem filtros aplicados | Regra central representada | Services.filtrarHistorico coordena HistoricoNotificacoes.filtrar pelas relações existentes; turmaRegistrada já identifica disciplina e turma. A seleção combina os dois critérios, exclui ESS de outro semestre e outras disciplinas do resultado e preserva todos os registros. |
-| [Visualização de uma falha no próprio histórico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L65) | Histórico de notificações | Regra central representada | consultarDetalhesNotificacao usa buscar(idNotificacao) e devolve nomeDestinatario, turmaRegistrada, dataHora, motivo, resultado e descricaoFalha do registro selecionado, preservando a falha original e todos os dados. |
+| [Visualização dos detalhes históricos de uma notificação](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L36) | Histórico de notificações | Regra central representada | `GET /api/notificacoes/historico/:id` consulta `HistoricoNotificacoes.buscar()` no histórico de lembretes. A linha expandida mostra o e-mail, o prazo e as pendências registrados na tentativa, inclusive depois que as notas são lançadas. Validado em Chrome/Cucumber (perfil historicoGui). |
+| [Filtragem do próprio histórico por disciplina e turma](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L50) | Histórico de notificações — sem filtros aplicados | Regra central representada | A aba aplica filtros opcionais de disciplina e turma à listagem recebida, usando a turma gravada na tentativa. A seleção preserva a ordem da lista e limpar os filtros restaura todos os registros. Validado em Chrome/Cucumber (perfil historicoGui). |
+| [Visualização de uma falha no próprio histórico](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L66) | Histórico de notificações | Regra central representada | `GET /api/notificacoes/historico/:id` devolve a descrição original gravada na tentativa. A linha expandida a exibe junto dos demais dados da tentativa com status Falha. Validado em Chrome/Cucumber (perfil historicoGui). |
 | [Configuração da quantidade, datas e horários dos lembretes](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L79) | Turmas — turma 2026.2 de ESS disponível | Regra central representada | `atualizar` valida o conjunto final, a quantidade e os agendamentos antes de alterar a configuração. |
 | [Alteração de lembrete futuro sem afetar outra turma](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L104) | Configuração de lembretes — turma 2026.2 de ESS | Regra central representada | `reagendar` preserva identidade e demais lembretes; configurações ficam associadas às respectivas turmas. |
 | [Rejeição de quantidade de datas incompatível](../../features/Notificacao_falta_cadastrar_alguma_nota.feature#L130) | Configuração de lembretes — turma 2026.2 de ESS | Regra central representada | Quantidade e conjunto final devem corresponder; rejeição preserva a configuração anterior. |
@@ -528,35 +528,27 @@ históricas e o prazo registrado nos detalhes são descritos a seguir.
 
 ## Percurso da filtragem do histórico
 
-- **Métodos aprovados:** Services.filtrarHistorico(disciplina, turma) coordena
-  HistoricoNotificacoes.filtrar(disciplina, turma). A associação entre as classes
-  e a composição com Notificacao já existem; não são acrescentadas relações.
-- **Dados existentes:** turmaRegistrada identifica a turma e sua disciplina,
-  como 2026.2 de ESS. Não se acrescenta disciplinaRegistrada nem outro atributo
-  em Notificacao. O filtro usa os dados históricos registrados.
-- **Resultado do cenário:** selecionando ESS e 2026.2 de ESS, retornar a notificação
-  de 25/08/2026 às 09:00, com motivo Notas pendentes e resultado Enviado. As
-  notificações de 2026.1 de ESS e 2026.2 de Introdução a Programação ficam fora
-  desse resultado, mas permanecem no histórico com todos os seus dados.
-- **Preservação:** a filtragem mantém identificadores, datas, motivos, resultados
-  e demais dados. A consulta não envia email nem executa reenvio.
-
-A regra central de filtragem passa de Pendente para representada. As classes do
-cliente, Email Service, Interface, Notificacao e todas as relações permanecem
-inalteradas. No incremento da filtragem, o nome e os passos do cenário Gherkin
-foram preservados. Depois, a autenticação foi retirada com aprovação do responsável:
-o cenário começa com o professor no Histórico de notificações, sem filtros aplicados.
+- **Fonte:** a aba recebe todos os registros pela rota
+  `GET /api/notificacoes/historico` e filtra a lista já carregada.
+- **Critérios:** o rótulo histórico `turmaRegistrada`, como 2026.2 de ESS,
+  identifica a disciplina ESS e a turma completa. A disciplina escolhida limita
+  as opções de turma.
+- **Resultado do cenário:** a aba abre com todos os registros. Ao selecionar ESS e
+  2026.2 de ESS, só o registro dessa turma fica visível, com os mesmos dados e na
+  mesma ordem de origem. Limpar os filtros restaura a lista completa.
+- **Preservação:** os filtros operam na tela e mantêm os registros gravados
+  pelo agendador.
 
 ## Percurso das pendências históricas nos detalhes
 
 - **Dado aprovado:** Notificacao acrescenta apenas pendenciasRegistradas, uma
   lista dos alunos e avaliações sem nota informados naquela tentativa.
 - **Conteúdo preservado:** a notificação de 25/08/2026 às 09:00 registra João da
-  Silva - Prova 2 e Maria Souza - Projeto 1. O cadastro das notas 8,0 e 9,0 em
-  26/08/2026 às 10:00 não altera essa lista anterior.
-- **Consulta existente:** Services.consultarDetalhesNotificacao coordena
-  HistoricoNotificacoes.buscar(idNotificacao) e devolve também a lista registrada
-  na tentativa selecionada. Não recalcula as pendências pelas notas atuais.
+  Silva - Prova 2 e Maria Souza - Projeto 1. O lançamento posterior dos conceitos
+  MPA e MA preserva a lista da tentativa.
+- **Consulta das pendências:** `GET /api/notificacoes/historico/:id` usa
+  `HistoricoNotificacoes.buscar(idNotificacao)` e devolve a lista guardada na
+  tentativa selecionada.
 - **Tentativas distintas:** cada novo registro preserva sua própria lista; o
   registro de um reenvio não modifica a lista da tentativa anterior.
 
@@ -578,9 +570,8 @@ descrito a seguir.
   devolve prazoRegistrado de 31/08/2026 às 23:59 e as pendências João da Silva -
   Prova 2 e Maria Souza - Projeto 1. A data/hora da tentativa continua distinta
   da data limite para cadastrar as notas.
-- **Consulta e preservação:** Services.consultarDetalhesNotificacao usa o método
-  buscar(idNotificacao) existente e devolve também prazoRegistrado. Registrar
-  outra tentativa preserva o prazo e os demais dados dos registros anteriores.
+- **Consulta do prazo:** a mesma rota devolve `prazoRegistrado` junto dos demais
+  dados da tentativa.
 
 O único acréscimo deste incremento no desenho é prazoRegistrado em Notificacao;
 os métodos e as relações existentes são mantidos. O cenário de detalhes passa
