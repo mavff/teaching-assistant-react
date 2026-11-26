@@ -104,9 +104,25 @@ type EstadoHistorico =
   | { tipo: 'erro' }
   | { tipo: 'pronto'; registros: LinhaHistoricoNotificacao[] };
 
+function disciplinaDaTurma(turma: string): string {
+  // O agendador registra a turma no formato "ano.semestre de disciplina".
+  return /^\d{4}\.[12] de (.+)$/.exec(turma)?.[1] ?? '';
+}
+
+function correspondeAosFiltros(
+  registro: LinhaHistoricoNotificacao,
+  disciplina: string,
+  turma: string
+): boolean {
+  return (!disciplina || disciplinaDaTurma(registro.contexto) === disciplina) &&
+    (!turma || registro.contexto === turma);
+}
+
 export default function NotificationHistory() {
   const [estado, setEstado] = useState<EstadoHistorico>({ tipo: 'carregando' });
   const [idAberto, setIdAberto] = useState<number | null>(null);
+  const [disciplinaFiltro, setDisciplinaFiltro] = useState('');
+  const [turmaFiltro, setTurmaFiltro] = useState('');
 
   useEffect(() => {
     const consulta = new AbortController();
@@ -121,11 +137,76 @@ export default function NotificationHistory() {
     return () => consulta.abort(); // Cancela a busca se o usuário sair da aba.
   }, []);
 
+  const registros = estado.tipo === 'pronto' ? estado.registros : [];
+  const disciplinas = Array.from(new Set(
+    registros.map(registro => disciplinaDaTurma(registro.contexto)).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const turmas = Array.from(new Set(
+    registros
+      .filter(registro => correspondeAosFiltros(registro, disciplinaFiltro, ''))
+      .map(registro => registro.contexto)
+  )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const registrosVisiveis = registros.filter(registro =>
+    correspondeAosFiltros(registro, disciplinaFiltro, turmaFiltro)
+  );
+
+  function aplicarFiltros(disciplina: string, turma: string): void {
+    setDisciplinaFiltro(disciplina);
+    setTurmaFiltro(turma);
+
+    // Recolhe os detalhes quando a tentativa selecionada sai do resultado.
+    setIdAberto(atual => registros.some(registro =>
+      registro.id === atual && correspondeAosFiltros(registro, disciplina, turma)
+    ) ? atual : null);
+  }
+
   return (
     <section id="notification-history" aria-labelledby="notification-history-title">
       <h2 id="notification-history-title">Histórico de notificações</h2>
       {estado.tipo === 'carregando' && <p role="status">Carregando histórico…</p>}
       {estado.tipo === 'erro' && <p role="alert">Não foi possível carregar o histórico</p>}
+      {estado.tipo === 'pronto' && registros.length > 0 && (
+        <fieldset>
+          <legend>Filtrar histórico</legend>
+          <label htmlFor="historico-filtro-disciplina">Disciplina</label>
+          <select
+            id="historico-filtro-disciplina"
+            data-cy="historico-filtro-disciplina"
+            value={disciplinaFiltro}
+            onChange={event => {
+              const disciplina = event.target.value;
+              const turma = disciplina && disciplinaDaTurma(turmaFiltro) !== disciplina
+                ? ''
+                : turmaFiltro;
+              aplicarFiltros(disciplina, turma);
+            }}
+          >
+            <option value="">Todas as disciplinas</option>
+            {disciplinas.map(disciplina => (
+              <option key={disciplina} value={disciplina}>{disciplina}</option>
+            ))}
+          </select>
+
+          <label htmlFor="historico-filtro-turma">Turma</label>
+          <select
+            id="historico-filtro-turma"
+            data-cy="historico-filtro-turma"
+            value={turmaFiltro}
+            onChange={event => aplicarFiltros(disciplinaFiltro, event.target.value)}
+          >
+            <option value="">Todas as turmas</option>
+            {turmas.map(turma => <option key={turma} value={turma}>{turma}</option>)}
+          </select>
+
+          <button
+            type="button"
+            data-cy="historico-limpar-filtros"
+            onClick={() => aplicarFiltros('', '')}
+          >
+            Limpar filtros
+          </button>
+        </fieldset>
+      )}
       {estado.tipo === 'pronto' && (
         estado.registros.length === 0 ? (
           <p>Nenhuma notificação registrada</p>
@@ -142,7 +223,7 @@ export default function NotificationHistory() {
                 </tr>
               </thead>
               <tbody>
-                {estado.registros.map(({ id, origem, contexto, dataHora, motivo, resultado }) => {
+                {registrosVisiveis.map(({ id, origem, contexto, dataHora, motivo, resultado }) => {
                   const expandido = idAberto === id;
                   const idDetalhes = `historico-detalhes-${id}`;
 
