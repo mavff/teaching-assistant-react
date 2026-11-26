@@ -1265,6 +1265,44 @@ tbody tr:last-child td {
   color: #991b1b;
 }
 
+/* Notifications tab */
+.notification-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.notification-item {
+  border-left: 4px solid #999;
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.notification-item.improvement {
+  border-left-color: #2e9e5b;
+}
+
+.notification-item.decline {
+  border-left-color: #d9822b;
+}
+
+.notification-item.classification {
+  border-left-color: #2f6fd6;
+}
+
+.notification-item.unread {
+  font-weight: 600;
+}
+
+.notification-item.read {
+  opacity: 0.75;
+}
+
 /* Aviso de e-mail de atualização de resultado enviado (aba Evaluations) */
 .result-update-success {
   background: #f0fff4;

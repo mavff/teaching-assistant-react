@@ -98,6 +98,7 @@ const DEFAULT_PESOS_DAS_METAS = new Map<Meta, number>(
   EVALUATION_GOALS.map(meta => [meta, 1] as [Meta, number])
 );
 
+
 export const DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA = new EspecificacaoDoCalculoDaMedia(
   DEFAULT_PESOS_DOS_CONCEITOS,
   DEFAULT_PESOS_DAS_METAS
