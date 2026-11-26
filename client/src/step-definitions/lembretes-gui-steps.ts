@@ -18,7 +18,6 @@ interface ClassesDaApiDeTeste {
 
 type TurmaDoCenario = {
   id: string;
-  topic: string;
   ano: string;
   semestre: string;
   rota: string;
@@ -30,7 +29,41 @@ const turmasDoCenario = new Map<string, TurmaDoCenario>();
 
 const tags = '@lembretes-configuracao-gui';
 const fuso = 'America/Sao_Paulo';
-const telaLembretes = '[aria-labelledby="reminder-settings-title"]';
+function dataCy(nome: string): string {
+  // Mantém válido o seletor se o ID da turma contiver aspas ou barras invertidas.
+  const valor = nome.replace(/["\\\n\r\f]/g, caractere =>
+    `\\${caractere.charCodeAt(0).toString(16)} `
+  );
+  return `[data-cy="${valor}"]`;
+}
+
+const SELETORES = {
+  abaClasses: '[data-testid="classes-tab"]',
+  turmasPagina: dataCy('turmas-pagina'),
+  turmasTitulo: dataCy('turmas-titulo'),
+  turma: (id: string) => dataCy(`turma-${id}`),
+  configurarLembretes: dataCy('configurar-lembretes'),
+  configuracaoPagina: dataCy('config-lembretes-pagina'),
+  configuracaoTitulo: dataCy('config-lembretes-titulo'),
+  configuracaoTurma: dataCy('config-lembretes-turma'),
+  prazoAcademico: dataCy('prazo-academico'),
+  quantidadeLembretes: dataCy('quantidade-lembretes'),
+  lembreteLinha: dataCy('lembrete-linha'),
+  lembreteData: dataCy('lembrete-data'),
+  lembreteRemover: dataCy('lembrete-remover'),
+  lembreteEstado: dataCy('lembrete-estado'),
+  adicionarLembrete: dataCy('adicionar-lembrete'),
+  salvarConfiguracao: dataCy('salvar-configuracao'),
+  mensagemErro: dataCy('mensagem-erro'),
+  mensagemSucesso: dataCy('mensagem-sucesso'),
+  quantidadeSalva: dataCy('lembretes-salvos-quantidade'),
+  lembreteSalvo: dataCy('lembrete-salvo'),
+  editarLembretes: dataCy('editar-lembretes')
+};
+
+function naConfiguracao(seletor: string): string {
+  return `${SELETORES.configuracaoPagina} ${seletor}`;
+}
 
 let pasta: string | undefined;
 let servidor: Server | undefined;
@@ -61,24 +94,24 @@ async function requisitar(
   return resposta;
 }
 
-async function clicar(texto: string, celulasDaTurma: string[] = []): Promise<void> {
-  const alvo = await pagina.waitForFunction((nome, celulas) =>
-    Array.from(document.querySelectorAll('button')).find(botao => {
-      // Quando há uma turma indicada, compara disciplina, ano e semestre na linha do botão.
-      const linha = botao.closest('tr');
-      return botao.textContent?.trim() === nome && !botao.disabled &&
-        celulas.every((valor, indice) => linha?.cells[indice]?.textContent?.trim() === valor);
-    }), {}, texto, celulasDaTurma);
-  const elemento = alvo.asElement();
-  assert(elemento);
-  const botao = await elemento.toElement('button');
+async function clicar(seletor: string): Promise<void> {
+  const botao = await pagina.waitForSelector(`${seletor}:enabled`, { visible: true });
+  assert(botao);
   await botao.click();
 }
 
-async function preencher(seletor: string, valor: string): Promise<void> {
-  await pagina.waitForSelector(`${seletor}:enabled`);
-  await pagina.$eval(seletor, (campo, texto) => {
-    // O setter nativo permite ao React detectar a alteração do campo.
+async function preencher(seletor: string, valor: string, indiceDaLinha?: number): Promise<void> {
+  const alvo = await pagina.waitForFunction((campo, linhas, indice) => {
+    // Com índice, a busca pelo campo acontece dentro da linha escolhida.
+    const contexto = indice === undefined ? document : document.querySelectorAll(linhas)[indice];
+    return contexto?.querySelector<HTMLInputElement>(`${campo}:enabled`);
+  }, {}, seletor, naConfiguracao(SELETORES.lembreteLinha), indiceDaLinha);
+
+  const elemento = alvo.asElement();
+  assert(elemento);
+
+  await elemento.evaluate((campo, texto) => {
+    // Preserva o setter e os eventos que o React usa para detectar a edição.
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
       ?.set?.call(campo, texto);
     campo.dispatchEvent(new Event('input', { bubbles: true }));
@@ -86,10 +119,10 @@ async function preencher(seletor: string, valor: string): Promise<void> {
   }, valor);
 }
 
-async function conferirTexto(seletor: string, esperado: string): Promise<void> {
-  await pagina.waitForFunction((alvo, texto) =>
-    document.querySelector(alvo)?.textContent?.trim() === texto,
-  {}, seletor, esperado);
+async function conferirTexto(seletor: string, esperado: string, indice = 0): Promise<void> {
+  await pagina.waitForFunction((alvo, texto, posicao) =>
+    document.querySelectorAll(alvo)[posicao]?.textContent?.trim() === texto,
+  {}, seletor, esperado, indice);
 }
 
 function obterTurmaDoCenario(nome: string): TurmaDoCenario {
@@ -109,7 +142,7 @@ async function cadastrarTurmaDoCenario(nome: string): Promise<void> {
   const { id } = await resposta.json();
 
   turmasDoCenario.set(nome, {
-    id, topic, ano, semestre, rota: `/api/classes/${encodeURIComponent(id)}/lembretes`
+    id, ano, semestre, rota: `/api/classes/${encodeURIComponent(id)}/lembretes`
   });
 }
 
@@ -232,8 +265,8 @@ Given(
     turmaSelecionada = turma;
 
     await pagina.goto('http://localhost:3004/', { waitUntil: 'domcontentloaded' });
-    await clicar('Classes');
-    await conferirTexto('.classes-container h2', 'Class Management');
+    await clicar(SELETORES.abaClasses); // Usa o atributo que a aba já possui.
+    await conferirTexto(`${SELETORES.turmasPagina} ${SELETORES.turmasTitulo}`, 'Class Management');
   }
 );
 
@@ -254,34 +287,38 @@ Given('o prazo acadêmico da turma {string} é {string}', async (turma: string, 
 When('{string} acessa a tela {string} da turma {string}',
   async (_professor: string, tela: string, turma: string) => {
     assert.equal(turma, turmaSelecionada);
-    const { topic, ano, semestre } = obterTurmaDoCenario(turma);
-    const semestreNaTela = semestre === '1' ? '1st Semester' : '2nd Semester';
-    await clicar('Configurar lembretes', [topic, ano, semestreNaTela]);
-    await conferirTexto('#reminder-settings-title', tela);
-  });
+    const { id } = obterTurmaDoCenario(turma);
 
-When('inicia a edição dos lembretes', () => clicar('Editar lembretes'));
+    // O botão é procurado dentro da linha identificada pelo ID retornado pela API.
+    await clicar(`${SELETORES.turmasPagina} ${SELETORES.turma(id)} ${SELETORES.configurarLembretes}`);
+    await conferirTexto(naConfiguracao(SELETORES.configuracaoTitulo), tela);
+  }
+);
+
+When('inicia a edição dos lembretes', () =>
+  clicar(naConfiguracao(SELETORES.editarLembretes)) // Localiza o botão pelo atributo.
+);
 
 When('informa {string} como quantidade de lembretes', (quantidade: string) =>
-  preencher('#reminder-count', quantidade)
+  preencher(naConfiguracao(SELETORES.quantidadeLembretes), quantidade)
 );
 
 When('adiciona {int} lembrete(s)', async (quantidade: number) => {
   for (let adicionado = 0; adicionado < quantidade; adicionado++) {
-    await clicar('Adicionar lembrete');
+    await clicar(naConfiguracao(SELETORES.adicionarLembrete)); // Espera o botão a cada clique.
   }
 });
 
 When('marca o lembrete de {string} para remoção', async (data: string) => {
-  const alvo = await pagina.waitForFunction((seletor, valor) => {
-    // Procura a linha pela data visível no formulário, mesmo se a posição mudar.
-    const linha = Array.from(document.querySelectorAll(seletor)).find(item =>
-      item.querySelector<HTMLInputElement>('input')?.value === valor
+  const alvo = await pagina.waitForFunction((linhas, campo, remover, valor) => {
+    const linha = Array.from(document.querySelectorAll(linhas)).find(item =>
+      item.querySelector<HTMLInputElement>(campo)?.value === valor
     );
-    return Array.from(linha?.querySelectorAll('button') ?? []).find(botao =>
-      !botao.disabled && botao.textContent?.trim() === 'Remover'
-    );
-  }, {}, `${telaLembretes} .reminder-edit-row`, dataParaCampo(data));
+
+    // Procura o botão habilitado só na linha que contém a data solicitada.
+    return linha?.querySelector<HTMLButtonElement>(`${remover}:enabled`);
+  }, {}, naConfiguracao(SELETORES.lembreteLinha), SELETORES.lembreteData,
+  SELETORES.lembreteRemover, dataParaCampo(data));
 
   const elemento = alvo.asElement();
   assert(elemento);
@@ -289,40 +326,41 @@ When('marca o lembrete de {string} para remoção', async (data: string) => {
   await botao.click();
 });
 
-// Os campos usam índices a partir de zero; a lista do resumo usa posições a partir de um.
+// O formulário e a lista salva usam a mesma ordem, com índices a partir de zero.
 const indicesDosLembretes = { primeiro: 0, segundo: 1, terceiro: 2 };
 type OrdemLembrete = keyof typeof indicesDosLembretes;
 
 When(/^define o (primeiro|segundo|terceiro) lembrete para "([^"]+)"$/,
   (ordem: OrdemLembrete, data: string) =>
-    preencher(`#reminder-date-${indicesDosLembretes[ordem]}`, dataParaCampo(data))
+    preencher(SELETORES.lembreteData, dataParaCampo(data), indicesDosLembretes[ordem])
 );
 
-When('salva a configuração', () => clicar('Salvar configuração'));
+When('salva a configuração', () =>
+  clicar(naConfiguracao(SELETORES.salvarConfiguracao))
+);
 
 Then('{string} permanece na tela {string} da turma {string}',
   async (_professor: string, tela: string, turma: string) => {
-    await conferirTexto('#reminder-settings-title', tela);
-    await conferirTexto(`${telaLembretes} > p > strong`, turma);
-  });
-
-Then('a tela apresenta a confirmação {string}', (mensagem: string) =>
-  conferirTexto(`${telaLembretes} [role="status"]`, mensagem)
-);
-
-Then('a quantidade de lembretes configurados é {string}', (quantidade: string) =>
-  conferirTexto('#saved-reminders-title + p', `Quantidade de lembretes: ${quantidade}`)
-);
-
-Then(/^o (primeiro|segundo|terceiro) lembrete está programado para "([^"]+)"$/,
-  (ordem: OrdemLembrete, data: string) => {
-    const posicao = indicesDosLembretes[ordem] + 1;
-    return conferirTexto(`${telaLembretes} ol li:nth-child(${posicao})`, data);
+    await conferirTexto(naConfiguracao(SELETORES.configuracaoTitulo), tela);
+    await conferirTexto(naConfiguracao(SELETORES.configuracaoTurma), turma);
   }
 );
 
+Then('a tela apresenta a confirmação {string}', (mensagem: string) =>
+  conferirTexto(naConfiguracao(SELETORES.mensagemSucesso), mensagem)
+);
+
+Then('a quantidade de lembretes configurados é {string}', (quantidade: string) =>
+  conferirTexto(naConfiguracao(SELETORES.quantidadeSalva), `Quantidade de lembretes: ${quantidade}`)
+);
+
+Then(/^o (primeiro|segundo|terceiro) lembrete está programado para "([^"]+)"$/,
+  (ordem: OrdemLembrete, data: string) =>
+    conferirTexto(naConfiguracao(SELETORES.lembreteSalvo), data, indicesDosLembretes[ordem])
+);
+
 Then('o prazo acadêmico apresentado é {string}', (prazo: string) =>
-  conferirTexto(`${telaLembretes} > p:nth-of-type(2) > strong`, prazo)
+  conferirTexto(naConfiguracao(SELETORES.prazoAcademico), prazo)
 );
 
 Given('a turma {string} possui um lembrete não enviado para {string}',
@@ -380,14 +418,15 @@ Given(
 );
 
 When('deixa o terceiro lembrete sem data e horário', async () => {
-  // Confere que o campo foi criado e que permanece vazio antes do envio.
-  await pagina.waitForFunction(() =>
-    document.querySelector<HTMLInputElement>('#reminder-date-2')?.value === ''
-  );
+  await pagina.waitForFunction((linhas, campo, indice) =>
+    document.querySelectorAll(linhas)[indice]
+      ?.querySelector<HTMLInputElement>(campo)?.value === '',
+  {}, naConfiguracao(SELETORES.lembreteLinha), SELETORES.lembreteData, indicesDosLembretes.terceiro);
+  // Só passa quando o terceiro campo existe e está vazio.
 });
 
 Then('a tela apresenta o erro {string}', (mensagem: string) =>
-  conferirTexto(`${telaLembretes} [role="alert"]`, mensagem)
+  conferirTexto(naConfiguracao(SELETORES.mensagemErro), mensagem)
 );
 
 Then('a configuração gravada permanece igual à anterior', async () => {
@@ -399,25 +438,27 @@ Then('a configuração gravada permanece igual à anterior', async () => {
 
 Then('o lembrete de {string} aparece como {string} com a edição bloqueada',
   async (data: string, estado: string) => {
-    await pagina.waitForFunction((seletor, valor, estadoEsperado) =>
-      Array.from(document.querySelectorAll(seletor)).some(linha => {
-        const campo = linha.querySelector<HTMLInputElement>('input[type="datetime-local"]');
-        const acao = linha.querySelector('.reminder-row-actions');
+    await pagina.waitForFunction((linhas, campo, estadoExibido, remover, valor, estadoEsperado) =>
+      Array.from(document.querySelectorAll(linhas)).some(linha => {
+        const input = linha.querySelector<HTMLInputElement>(campo);
 
-        // Confere a data bloqueada, o estado exibido e a ausência da ação Remover na mesma linha.
-        return campo?.value === valor && campo.disabled &&
-          acao?.textContent?.trim() === estadoEsperado && !acao.querySelector('button');
+        // A data, o bloqueio, o estado e a ausência do botão pertencem à mesma linha.
+        return input?.value === valor && input.disabled &&
+          linha.querySelector(estadoExibido)?.textContent?.trim() === estadoEsperado &&
+          !linha.querySelector(remover);
       }),
-    {}, `${telaLembretes} .reminder-edit-row`, dataParaCampo(data), estado);
+    {}, naConfiguracao(SELETORES.lembreteLinha), SELETORES.lembreteData,
+    SELETORES.lembreteEstado, SELETORES.lembreteRemover, dataParaCampo(data), estado);
   }
 );
 
 Then('o lembrete pendente de {string} continua editável', async (data: string) => {
-  // Procura a data entre os campos que a interface permite editar.
-  await pagina.waitForFunction((seletor, valor) =>
-    Array.from(document.querySelectorAll<HTMLInputElement>(seletor))
-      .some(campo => campo.value === valor),
-  {}, `${telaLembretes} .reminder-edit-row input:enabled`, dataParaCampo(data));
+  await pagina.waitForFunction((linhas, campo, valor) =>
+    Array.from(document.querySelectorAll(linhas)).some(linha =>
+      linha.querySelector<HTMLInputElement>(`${campo}:enabled`)?.value === valor
+    ),
+  {}, naConfiguracao(SELETORES.lembreteLinha), SELETORES.lembreteData, dataParaCampo(data));
+  // A data esperada precisa estar em um campo habilitado.
 });
 
 Then(
