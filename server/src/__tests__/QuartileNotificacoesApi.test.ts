@@ -4,7 +4,7 @@ import { EmailSenderSimulado } from '../models/EmailSender';
 import { PeriodoAcademico } from '../models/PeriodoAcademico';
 import { Student } from '../models/Student';
 import { Class } from '../models/Class';
-import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from '../models/EspecificacaoDoCalculoDaMedia';
+import { EspecificacaoDoCalculoDaMedia } from '../models/EspecificacaoDoCalculoDaMedia';
 import { EVALUATION_GOALS } from '../models/Evaluation';
 
 type Grade = 'MA' | 'MPA' | 'MANA';
@@ -19,6 +19,10 @@ const STUDENTS = [
   { name: 'Davi Reis',  cpf: '44444444444', email: 'davi@email.com', grades: ['MANA', 'MANA'] }
 ] as { name: string; cpf: string; email: string; grades: [Grade, Grade] }[];
 const [ANA, BIA, CAIO, DAVI] = STUDENTS.map(s => s.cpf);
+const ESPECIFICACAO_TESTE = new EspecificacaoDoCalculoDaMedia(
+  new Map([['MA', 10], ['MPA', 7], ['MANA', 0]]),
+  new Map(EVALUATION_GOALS.map(meta => [meta, 1]))
+);
 const CLASS_ID = 'ESS-2026-2';
 
 const grade = (cpf: string, goal: string, value: Grade) =>
@@ -32,7 +36,7 @@ describe('Quartile-change notifications', () => {
     notificationCenter.restore();
     (services.gradeNotificationSender as EmailSenderSimulado).enviados.length = 0;
 
-    const classObj = new Class('ESS', new PeriodoAcademico(2026, 2), DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
+    const classObj = new Class('ESS', new PeriodoAcademico(2026, 2), ESPECIFICACAO_TESTE);
     classes.addClass(classObj);
     STUDENTS.forEach(s => {
       const student = studentSet.addStudent(new Student(s.name, s.cpf, s.email));

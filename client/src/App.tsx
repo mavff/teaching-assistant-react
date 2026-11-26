@@ -172,7 +172,9 @@ const App: React.FC = () => {
             data-testid="student-notifications-tab"
           >
             Notifications
-                      className={`tab-button ${activeTab === 'results' ? 'active' : ''}`}
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'results' ? 'active' : ''}`}
             onClick={() => setActiveTab('results')}
             data-testid="results-tab"
           >

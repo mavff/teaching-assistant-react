@@ -7,7 +7,7 @@ import { EmailSenderSimulado } from '../models/EmailSender';
 import { PeriodoAcademico } from '../models/PeriodoAcademico';
 import { Student } from '../models/Student';
 import { Class } from '../models/Class';
-import { DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA } from '../models/EspecificacaoDoCalculoDaMedia';
+import { EspecificacaoDoCalculoDaMedia } from '../models/EspecificacaoDoCalculoDaMedia';
 import { EVALUATION_GOALS, Grade } from '../models/Evaluation';
 
 // Final points: Ana 60, Bia 42, Caio 10, Davi 0  =>  Q4, Q3, Q2, Q1
@@ -17,6 +17,10 @@ const PEOPLE: { name: string; cpf: string; first: Grade; last: Grade }[] = [
   { name: 'Caio Melo', cpf: '33333333333', first: 'MANA', last: 'MA' },
   { name: 'Davi Reis', cpf: '44444444444', first: 'MANA', last: 'MANA' }
 ];
+const ESPECIFICACAO_TESTE = new EspecificacaoDoCalculoDaMedia(
+  new Map([['MA', 10], ['MPA', 7], ['MANA', 0]]),
+  new Map(EVALUATION_GOALS.map(meta => [meta, 1]))
+);
 const CLASS_ID = 'ESS-2026-2';
 const LAST_GOAL = EVALUATION_GOALS[EVALUATION_GOALS.length - 1];
 
@@ -24,7 +28,7 @@ const notificationsOf = async (cpf: string) => (await request(app).get(`/api/stu
 
 /** A class that only misses the last grade of each student. */
 const classMissingTheLastGrade = (students = studentSet, classCollection = classes) => {
-  const classObj = new Class('ESS', new PeriodoAcademico(2026, 2), DEFAULT_ESPECIFICACAO_DO_CALCULO_DA_MEDIA);
+  const classObj = new Class('ESS', new PeriodoAcademico(2026, 2), ESPECIFICACAO_TESTE);
   classCollection.addClass(classObj);
   PEOPLE.forEach(p => {
     const enrollment = classObj.addEnrollment(students.addStudent(new Student(p.name, p.cpf, `${p.name.split(' ')[0].toLowerCase()}@aluno.test`)));
