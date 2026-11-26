@@ -6,6 +6,7 @@ import { Lembrete } from './Lembrete';
 import { Notificacao } from './Notificacao';
 
 const INTERVALO_VERIFICACAO_MS = 30_000;
+// Cada espera começa após a falha anterior. São até três reenvios além da tentativa inicial.
 const INTERVALOS_REENVIO_MS = [15_000, 30_000, 45_000];
 
 type DependenciasLembretes = {
@@ -29,10 +30,12 @@ export class NotificacaoService {
     private readonly lembretes?: DependenciasLembretes
   ) {}
 
+  /** Mantém o mesmo nome da turma para o conteúdo do e-mail e o histórico. */
   private static nomeDaTurma(turma: Class): string {
     return `${turma.getYear()}.${turma.getSemester()} de ${turma.getTopic()}`;
   }
 
+  /** Monta a mensagem e os dados do histórico a partir das pendências atuais da turma. */
   static montarEmailNotasPendentes(
     turma: Class,
     destinatario: string,
@@ -90,6 +93,7 @@ export class NotificacaoService {
     };
   }
 
+  /** Inicia a verificação regular, programa os reenvios e devolve a função que encerra os temporizadores. */
   iniciarVerificacaoDeLembretes(persistirResultados?: () => boolean): () => void {
     if (this.pararVerificacao) return this.pararVerificacao;
     const dependencias = this.lembretes;
@@ -104,6 +108,7 @@ export class NotificacaoService {
       temporizadorReenvio = undefined;
     };
 
+    /** Prepara um temporizador se o próximo reenvio vencer antes da rodada regular. */
     const agendarProximoReenvio = (inicioDaRodada: number) => {
       limparTemporizadorReenvio();
       if (this.pararVerificacao !== parar || gravacaoPendente) return;
@@ -128,6 +133,7 @@ export class NotificacaoService {
       }
     };
 
+    /** Mantém a gravação pendente até o armazenamento confirmar o resultado. */
     const gravar = () => {
       gravacaoPendente = true;
       if (!persistirResultados?.()) return;
@@ -182,6 +188,7 @@ export class NotificacaoService {
     return parar;
   }
 
+  /** Seleciona os lembretes vencidos pelo horário do reenvio ou do agendamento original. */
   async processarLembretesAteAgora(somenteReenvios = false): Promise<Notificacao[]> {
     const dependencias = this.lembretes;
     if (!dependencias) throw new Error('Processamento de lembretes não configurado');
@@ -203,6 +210,7 @@ export class NotificacaoService {
     return registros;
   }
 
+  /** Processa os lembretes cadastrados para o horário original de uma turma. */
   async processarAgendados(turmaId: string, data: string, horario: string): Promise<Notificacao[]> {
     const dependencias = this.lembretes;
     if (!dependencias) throw new Error('Processamento de lembretes não configurado');
@@ -224,6 +232,7 @@ export class NotificacaoService {
     return registros;
   }
 
+  /** Decide entre enviar, ignorar ou cancelar com base no estado, no prazo e nas notas atuais. */
   private async processar(
     turma: Class,
     lembrete: Lembrete,
@@ -239,6 +248,7 @@ export class NotificacaoService {
 
     const turmaRegistrada = NotificacaoService.nomeDaTurma(turma);
     const lembreteId = lembrete.getId();
+    // O limite e a proteção contra duplicidade usam as tentativas do mesmo lembrete na mesma turma.
     const tentativas = this.historico.listar().filter(registro =>
       registro.turmaRegistrada === turmaRegistrada &&
       registro.lembreteId === lembreteId &&
@@ -318,6 +328,7 @@ export class NotificacaoService {
     return [tentativa];
   }
 
+  /** Encerra o reenvio e sinaliza que a mudança de estado precisa ser gravada. */
   private cancelarReenvio(turma: Class, lembreteId: string, motivo: string): void {
     turma.cancelarReenvioDeLembrete(lembreteId, motivo);
     this.cancelamentoPendenteDeGravacao = true;

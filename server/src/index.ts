@@ -21,7 +21,8 @@ const servidor = app.listen(PORT, () => {
   // Usa os mesmos dados que as rotas carregam e atualizam.
   const notificacoes = new NotificacaoService(historicoLembretes, new EmailSenderSimulado(), {
     classes,
-    emailSender
+    emailSender // O agendador usa este remetente SMTP para os lembretes.
   });
+  // Inicia o agendador com a gravação em disco e registra sua função de parada no fechamento.
   servidor.once('close', notificacoes.iniciarVerificacaoDeLembretes(saveDataToFile));
 });
