@@ -36,10 +36,11 @@ const historicoLembretes = new HistoricoNotificacoes(); // Histórico das turmas
 const periodosAcademicos = new Map<string, PeriodoAcademico>(); // Mantém um período por identificação, como 2026.2, mesmo sem turmas cadastradas.
 const dataFile = path.resolve('./data/app-data.json');
 
+/** Compartilha o mesmo período entre as turmas do mesmo ano e semestre. */
 const obterOuCriarPeriodoAcademico = (ano: number, semestre: number): PeriodoAcademico => {
   const identificador = `${ano}.${semestre}`;
   const existente = periodosAcademicos.get(identificador);
-  if (existente) return existente; // Reutiliza a mesma instância para todas as turmas do período.
+  if (existente) return existente;
   const novo = new PeriodoAcademico(ano, semestre); // Nenhum prazo é presumido para um período ainda não configurado.
   periodosAcademicos.set(identificador, novo);
   return novo;
@@ -53,10 +54,11 @@ const ensureDataDirectory = (): void => {
   }
 };
 
+/** Grava os dados juntos e aceita propostas já validadas antes de elas serem aplicadas em memória. */
 const saveDataToFile = (
   periodosParaSalvar: ReadonlyMap<string, PeriodoAcademico> = periodosAcademicos,
   configuracoesParaSalvar: ReadonlyMap<string, ConfiguracaoLembretes> = new Map()
-): boolean => { // Grava a proposta antes de alterar períodos ou lembretes em memória.
+): boolean => {
   try {
     const data = {
       historicoLembretes: historicoLembretes.toJSON(),
@@ -97,7 +99,7 @@ const saveDataToFile = (
   }
 };
 
-// Load data from file
+/** Restaura o histórico, os períodos e as configurações antes de atender às requisições. */
 const loadDataFromFile = (): void => {
   try {
     if (fs.existsSync(dataFile)) {
@@ -236,6 +238,7 @@ const cleanCPF = (cpf: string): string => {
 
 // Routes
 
+// Consulta o período pelo ano e semestre. Um período cadastrado pode estar sem prazo.
 app.get('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response) => {
   try {
     const identidade = new PeriodoAcademico(Number(req.params.ano), Number(req.params.semestre)); // Valida ano e semestre sem cadastrar um período.
@@ -255,6 +258,7 @@ app.get('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
   }
 });
 
+// Valida o novo prazo com os agendamentos do período e grava antes de aplicar o valor em memória.
 app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response) => {
   try {
     const ano = Number(req.params.ano);
@@ -299,6 +303,7 @@ app.put('/api/periodos-academicos/:ano/:semestre', (req: Request, res: Response)
   }
 });
 
+// Lista os resultados do agendador, do mais recente ao mais antigo, com desempate pelo ID.
 app.get('/api/notificacoes/historico', (_req: Request, res: Response) => {
   const registros = historicoLembretes.listar()
     .sort((a, b) => b.dataHora.getTime() - a.dataHora.getTime() || b.id - a.id)
@@ -321,6 +326,7 @@ app.get('/api/notificacoes/historico', (_req: Request, res: Response) => {
   res.json(registros);
 });
 
+// Consulta pelo ID e devolve os dados guardados na tentativa, incluindo a descrição da falha.
 app.get('/api/notificacoes/historico/:id', (req: Request, res: Response) => {
   const id = /^[1-9]\d*$/.test(req.params.id) ? Number(req.params.id) : NaN;
   const registro = Number.isSafeInteger(id) ? historicoLembretes.buscar(id) : undefined;
@@ -330,7 +336,6 @@ app.get('/api/notificacoes/historico/:id', (req: Request, res: Response) => {
     return;
   }
 
-  // A consulta devolve o contexto guardado na tentativa.
   res.json({
     id: registro.id,
     origem: 'lembrete',
@@ -345,6 +350,7 @@ app.get('/api/notificacoes/historico/:id', (req: Request, res: Response) => {
   });
 });
 
+/** Reúne o prazo oficial e os lembretes devolvidos pelas rotas de consulta e edição. */
 const apresentarConfiguracaoLembretes = (turma: Class) => ({
   turmaId: turma.getClassId(),
   prazoAcademico: turma.getPrazoAcademico()?.toISOString() ?? null,
@@ -357,6 +363,7 @@ app.get('/api/classes/:id/lembretes', (req: Request, res: Response) => {
   res.json(apresentarConfiguracaoLembretes(turma)); // Consulta os lembretes e o prazo oficial da mesma turma.
 });
 
+// Valida a proposta inteira e, em produção, grava antes de atualizar a configuração em memória.
 app.put('/api/classes/:id/lembretes', (req: Request, res: Response) => {
   try {
     const turma = classes.findClassById(req.params.id);
@@ -519,10 +526,12 @@ app.get('/api/students/:cpf', (req: Request, res: Response) => {
   }
 });
 
+// Consulta o destinatário compartilhado, que pode estar vazio no primeiro acesso.
 app.get('/api/classes/email', (_req: Request, res: Response) => {
   res.json({ emailDasTurmas: classes.obterEmailDasTurmas() }); // Preenche o campo quando a aba abre.
 });
 
+// Valida o endereço, agenda a gravação e devolve o valor normalizado para a tela.
 app.put('/api/classes/email', (req: Request, res: Response) => {
   try {
     classes.definirEmailDasTurmas(req.body?.emailDasTurmas); // Valida antes de alterar o valor em memória.
