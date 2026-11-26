@@ -339,6 +339,7 @@ app.get('/api/notificacoes/historico/:id', (req: Request, res: Response) => {
     motivo: registro.motivo,
     resultado: registro.resultado,
     destinatario: registro.nomeDestinatario,
+    descricaoFalha: registro.descricaoFalha,
     prazoRegistrado: registro.prazoRegistrado?.toISOString() ?? null,
     pendenciasRegistradas: registro.pendenciasRegistradas
   });
