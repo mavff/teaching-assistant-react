@@ -28,6 +28,7 @@ module.exports = {
     require: ['src/step-definitions/lembretes-gui-steps.ts'],
     format: ['progress-bar']
   },
+  // Seleciona os quatro cenários de histórico pelo título e carrega os passos correspondentes.
   historicoGui: {
     paths: ['../features/Notificacao_falta_cadastrar_alguma_nota.feature'],
     name: [

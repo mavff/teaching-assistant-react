@@ -8,6 +8,7 @@ import { launch, type Browser, type Page } from 'puppeteer';
 import { Notificacao } from '../../../server/src/models/Notificacao';
 import type { HistoricoNotificacoes } from '../../../server/src/models/HistoricoNotificacoes';
 
+// Os hooks usam estes nomes para isolar a preparação dos quatro cenários de histórico.
 const nomesDosCenarios = new Set([
   'Visualização do histórico de notificações',
   'Visualização dos detalhes históricos de uma notificação',
@@ -23,6 +24,7 @@ let historico: HistoricoNotificacoes;
 let origemDaApi: string;
 let idSelecionado: number | undefined;
 
+/** Abre o Chrome e uma API isolada que recebe os dados de cada cenário. */
 Before({ timeout: 30_000 }, async ({ pickle }) => {
   if (!nomesDosCenarios.has(pickle.name)) return;
 
@@ -80,6 +82,7 @@ Before({ timeout: 30_000 }, async ({ pickle }) => {
   }, origemDaApi);
 });
 
+/** Fecha o navegador e a API e descarta o estado usado pelo cenário. */
 After({ timeout: 30_000 }, async ({ pickle }) => {
   if (!nomesDosCenarios.has(pickle.name)) return;
 
@@ -164,17 +167,20 @@ Then(
   }
 );
 
+/** Converte a data do cenário em um instante com o deslocamento de Brasília usado nos testes. */
 function instanteEmBrasilia(data: string): Date {
   const [dia, mes, ano, horario] = data.split(/\/| às /);
   return new Date(`${ano}-${mes}-${dia}T${horario}:00-03:00`);
 }
 
+/** Extrai aluno e meta do formato usado nas pendências escritas no cenário. */
 function lerPendencia(descricao: string) {
   const [nomeAluno, meta] = descricao.split(' - ');
   assert(nomeAluno && meta, `Pendência inválida no cenário: ${descricao}`);
   return { nomeAluno, meta };
 }
 
+/** Envia o corpo JSON à API isolada e confere o status antes de ler a resposta. */
 async function requisitarApi(metodo: string, rota: string, status: number, corpo: object) {
   const resposta = await fetch(`${origemDaApi}${rota}`, {
     method: metodo,
@@ -329,6 +335,7 @@ Then('os detalhes mostram a descrição da falha {string}', async (descricao: st
 const filtroDisciplina = '[data-cy="historico-filtro-disciplina"]';
 const filtroTurma = '[data-cy="historico-filtro-turma"]';
 
+/** Lê as turmas pelas células da tabela identificadas com data-cy. */
 async function conferirTurmasVisiveis(esperadas: string[]): Promise<void> {
   await pagina.waitForFunction(turmas => {
     const exibidas = Array.from(document.querySelectorAll('[data-cy="historico-turma"]'))
