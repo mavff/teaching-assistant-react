@@ -9,10 +9,11 @@ import Evaluations from './components/Evaluations';
 import Classes from './components/Classes';
 import Grupos from './components/Grupos';
 import NotificationHistory from './components/NotificationHistory';
+import ResultadosFinais from './components/ResultadosFinais';
 import AcademicPeriodSettings from './components/AcademicPeriodSettings';
 import './App.css';
 
-type TabType = 'students' | 'evaluations' | 'classes' | 'groups' | 'notification-history';
+type TabType = 'students' | 'evaluations' | 'classes' | 'groups' | 'notification-history' | 'results';
 
 const App: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -164,6 +165,13 @@ const App: React.FC = () => {
           >
             Groups
           </button>
+          <button
+            className={`tab-button ${activeTab === 'results' ? 'active' : ''}`}
+            onClick={() => setActiveTab('results')}
+            data-testid="results-tab"
+          >
+            Resultados Finais
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -239,6 +247,8 @@ const App: React.FC = () => {
 
           {activeTab === 'notification-history' && <NotificationHistory />}{/* A aba monta o histórico ao abrir e o desmonta ao sair. */}
           {activeTab === 'groups' && <Grupos />}
+
+          {activeTab === 'results' && <ResultadosFinais />}
         </div>
       </main>
     </div>
