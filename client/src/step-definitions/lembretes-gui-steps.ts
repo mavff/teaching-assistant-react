@@ -210,7 +210,7 @@ After({ tags, timeout: 30_000 }, async function () {
   }
 });
 
-Given('a data atual é {string}', { timeout: 30_000 }, async (data: string) => {
+Given('a data atual é {string}', { timeout: 30_000 }, async function (data: string) {
   const agora = new Date(dataParaCampo(data));
   assert.equal(Intl.DateTimeFormat().resolvedOptions().timeZone, fuso);
   mock.timers.enable({ apis: ['Date'], now: agora });
@@ -218,7 +218,7 @@ Given('a data atual é {string}', { timeout: 30_000 }, async (data: string) => {
 
   navegador = await launch({
     executablePath: process.env.CHROME_BIN,
-    headless: true,
+    headless: this.parameters.janela !== true, // A opção do Cucumber abre a janela só na demonstração.
     args: ['--no-sandbox', '--disable-dev-shm-usage']
   });
   pagina = await navegador.newPage();
