@@ -1,8 +1,5 @@
 import { DomainError } from '../models/DomainError';
 import { EmailSender, ResultadoEnvio } from '../models/EmailSender';
-import { Grupos } from '../models/Grupos';
-import { HistoricoNotificacoes } from '../models/HistoricoNotificacoes';
-import { Monitores } from '../models/Monitores';
 import {
   MOTIVO_ACUMULO, MOTIVO_ALOCACAO, MOTIVO_ENTRADA, MOTIVO_REMOCAO, MOTIVO_SAIDA, Services
 } from '../models/Services';
@@ -64,7 +61,7 @@ describe('Services (grupos, monitores e notificações)', () => {
     const recusa: EmailSender = {
       send: (): ResultadoEnvio => ({ aceito: false, descricaoFalha: 'Tempo limite excedido no envio' })
     };
-    const comFalha = new Services(new Grupos(), new Monitores(), new HistoricoNotificacoes(), recusa);
+    const comFalha = new Services({ emailSender: recusa });
     comFalha.cadastrarMonitor('joaosilva', 'Monitor joaosilva', 'joaosilva@cin.ufpe.br');
     comFalha.criarGrupo('ESS-G3', ['Mariana']);
 
