@@ -12,12 +12,14 @@ export interface Lembrete extends LembreteProposto {
   proximoReenvioEm: string | null; // Instante ISO ou null quando não existe reenvio programado.
 }
 
+/** Dados da API usados para carregar o formulário e mostrar o resumo da configuração salva. */
 export interface ConfiguracaoLembretes {
   turmaId: string;
   prazoAcademico: string | null; // Prazo oficial consultado pelo servidor para a turma.
   lembretes: Lembrete[]; // A quantidade é derivada da lista recebida.
 }
 
+/** Proposta completa do formulário para criar, editar ou remover lembretes. */
 export interface SalvarConfiguracaoLembretes {
   quantidade: number;
   lembretes: LembreteProposto[]; // O cliente não recebe permissão para definir estado ou reenvio.

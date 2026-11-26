@@ -63,6 +63,7 @@ const Classes: React.FC<ClassesProps> = ({
     loadAllStudents();
   }, [loadAllStudents]);
 
+  /** Carrega o destinatário compartilhado para o quadro de consulta e o formulário. */
   const loadClassesEmail = useCallback(() => {
     let active = true; // Cada chamada acompanha a própria consulta.
 
@@ -90,6 +91,7 @@ const Classes: React.FC<ClassesProps> = ({
 
   useEffect(() => loadClassesEmail(), [loadClassesEmail]);
 
+  /** Envia o endereço digitado e atualiza o quadro com o valor aceito pela API. */
   const handleSaveClassesEmail = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); // Salva pela API, sem recarregar a página.
     if (isLoadingClassesEmail || isSavingClassesEmail) return;

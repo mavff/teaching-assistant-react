@@ -7,6 +7,7 @@ export interface AcademicPeriod {
 const API_BASE_URL = 'http://localhost:3005';
 
 class AcademicPeriodService {
+  /** Consulta o prazo oficial do período identificado pelo ano e semestre. */
   static async getPeriod(ano: number, semestre: number): Promise<AcademicPeriod | null> {
     const response = await fetch(`${API_BASE_URL}/api/periodos-academicos/${ano}/${semestre}`);
 
@@ -20,11 +21,12 @@ class AcademicPeriodService {
     return data;
   }
 
+  /** Atualiza somente o prazo do período identificado na URL. */
   static async savePeriod(ano: number, semestre: number, prazoAcademico: string): Promise<AcademicPeriod> {
     const response = await fetch(`${API_BASE_URL}/api/periodos-academicos/${ano}/${semestre}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prazoAcademico }) // Envia somente o prazo; o período está identificado na URL.
+      body: JSON.stringify({ prazoAcademico })
     });
 
     const data = await response.json();

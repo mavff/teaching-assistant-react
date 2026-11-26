@@ -6,7 +6,7 @@ export interface Class {
   topic: string;
   semester: number;
   year: number;
-  prazoAcademico?: string | null; // Consulta em ISO o prazo compartilhado do período; a edição pertence à API de períodos.
+  prazoAcademico?: string | null; // Prazo compartilhado do período em ISO. A edição passa pela API de períodos.
   especificacaoDoCalculoDaMedia: EspecificacaoDoCalculoDaMedia;
   enrollments: Enrollment[];
 }

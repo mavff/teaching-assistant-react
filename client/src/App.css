@@ -513,6 +513,7 @@ tbody tr:last-child td {
   gap: 0.5rem;
 }
 
+/* Destaca a configuração confirmada quando o formulário está fechado. */
 .reminder-saved-card {
   margin-bottom: 1rem;
   padding: 1.25rem;

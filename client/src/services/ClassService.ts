@@ -20,6 +20,7 @@ class ClassService {
     }
   }
 
+  /** Consulta o endereço compartilhado que será usado nos lembretes. */
   static async getClassesEmail(): Promise<string | null> {
     const response = await fetch(`${API_BASE_URL}/api/classes/email`);
     if (!response.ok) {
@@ -30,6 +31,7 @@ class ClassService {
     return data.emailDasTurmas; // null indica que o endereço ainda está vazio.
   }
 
+  /** Salva o endereço na API e devolve o valor normalizado pelo servidor. */
   static async saveClassesEmail(emailDasTurmas: string): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/api/classes/email`, {
       method: 'PUT',
