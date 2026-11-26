@@ -10,10 +10,12 @@ export class HistoricoNotificacoes {
     return ++this.ultimoId;
   }
 
+  /** Acrescenta a notificação ao fim do histórico, na ordem em que foi registrada. */
   registrar(notificacao: Notificacao): void {
     this.notificacoes.push(notificacao);
   }
 
+  /** Devolve uma nova lista na ordem de registro para proteger a lista armazenada. */
   listar(): Notificacao[] {
     return [...this.notificacoes];
   }
@@ -22,14 +24,17 @@ export class HistoricoNotificacoes {
     return this.notificacoes.filter(n => n.grupoRegistrado === grupo);
   }
 
+  /** Localiza pelo ID o registro consultado pela rota de detalhes. */
   buscar(idNotificacao: number): Notificacao | undefined {
     return this.notificacoes.find(n => n.id === idNotificacao);
   }
 
+  /** Prepara cada notificação para gravação e preserva a ordem dos registros. */
   toJSON() {
     return this.notificacoes.map(notificacao => notificacao.toJSON());
   }
 
+  /** Valida os registros salvos e retoma a numeração a partir do maior ID encontrado. */
   restaurar(dados: unknown): void {
     // Arquivos anteriores a este incremento começam com histórico vazio.
     if (dados !== undefined && !Array.isArray(dados)) {
@@ -47,6 +52,7 @@ export class HistoricoNotificacoes {
     this.ultimoId = registros.reduce((maior, registro) => Math.max(maior, registro.id), 0);
   }
 
+  /** Esvazia o histórico e reinicia a contagem de IDs. */
   limpar(): void {
     this.notificacoes = [];
     this.ultimoId = 0;

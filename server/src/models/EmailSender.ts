@@ -25,6 +25,7 @@ export interface EmailSender {
 export class EmailSenderSimulado implements EmailSender {
   readonly enviados: { destinatario: string; assunto: string; conteudo: string }[] = [];
 
+  /** Guarda os argumentos em memória para verificar quais mensagens o chamador solicitou. */
   send(destinatario: string, assunto: string, conteudo: string): ResultadoEnvio {
     this.enviados.push({ destinatario, assunto, conteudo });
     return { aceito: true };
@@ -51,6 +52,7 @@ export class EmailSenderSmtp {
     if (ambiente) this.configurarTransporte(ambiente);
   }
 
+  /** Valida as credenciais e monta o transporte do Gmail quando ainda não existe um. */
   private configurarTransporte(ambiente: NodeJS.ProcessEnv = process.env): void {
     if (this.transporte) return;
 
