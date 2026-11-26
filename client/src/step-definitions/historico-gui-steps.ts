@@ -133,11 +133,13 @@ Then('a tela {string} é exibida', async (tela) => {
 
 Then(
   'é apresentada a notificação da turma {string}, registrada em {string}, com motivo {string} e status {string}',
-  async (turma, data, motivo, status) => {
-    await pagina.waitForFunction((esperados: string[]) =>
-      Array.from(document.querySelectorAll<HTMLTableRowElement>('#notification-history tbody tr'))
-        .some(linha => linha.cells.length === esperados.length &&
-          esperados.every((valor, indice) => linha.cells[indice].textContent?.trim() === valor)),
-    {}, [turma, data, motivo, status]); // Then: os quatro valores aparecem na mesma linha.
+  async (turma: string, data: string, motivo: string, status: string) => {
+    await pagina.waitForFunction(campos =>
+      Array.from(document.querySelectorAll('[data-cy^="historico-notificacao-"]')).some(linha =>
+        Object.entries(campos).every(([campo, esperado]) =>
+          linha.querySelector(`[data-cy="historico-${campo}"]`)?.textContent?.trim() === esperado
+        )
+      ),
+    {}, { turma, data, motivo, status }); // Os quatro valores precisam estar na mesma linha.
   }
 );
